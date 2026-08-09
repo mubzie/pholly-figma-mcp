@@ -4,5 +4,5 @@ node_modules/
 .env
 .DS_Store
 apps/server/plugin/
+pholly-figma-plugin/
 *.tgz
-/plugin/
