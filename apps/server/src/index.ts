@@ -92,7 +92,7 @@ if (!runSetup()) {
     try {
       if(req.url==='/ping') return sendJson(res,200,{ok:true,files:files.size,port});
       if(!isLocalHost(req.headers.host)) return sendJson(res,403,{error:'Forbidden'});
-      if(!isAuthed(req)) return sendJson(res,401,{error:'Unauthorized'});
+      if(!isAuthed(req)){console.error(`pholly-figma-mcp: rejected ${req.method} ${req.url} without a valid token`);return sendJson(res,401,{error:'Unauthorized'});}
       if(req.url==='/files') return sendJson(res,200,[...files.values()].map(x=>x.info));
       if(req.url==='/rpc'&&req.method==='POST'){const q=await body(req);const out=await rpc(q);return sendJson(res,out.ok?200:400,out);}
       if(req.url==='/mcp'&&req.method==='POST'){const q=await body(req);const result=await handleMcp(q);return sendJson(res,200,result);}
@@ -102,7 +102,12 @@ if (!runSetup()) {
   const wss = new WebSocketServer({
     server:http,
     path:'/ws',
-    verifyClient: (info: { origin: string; secure: boolean; req: IncomingMessage }) => isLocalHost(info.req.headers.host) && isAllowedOrigin(info.origin)
+    verifyClient: (info: { origin: string; secure: boolean; req: IncomingMessage }) => {
+      const hostOk = isLocalHost(info.req.headers.host);
+      const originOk = isAllowedOrigin(info.origin);
+      if (!hostOk || !originOk) console.error(`pholly-figma-mcp: rejected WebSocket upgrade from host=${info.req.headers.host} origin=${info.origin}`);
+      return hostOk && originOk;
+    }
   });
   wss.on('error',()=>{});
   wss.on('connection',socket=>{let key='';socket.on('message',raw=>{try{const msg=JSON.parse(raw.toString());if(msg.type==='hello'){if(!tokenMatches(token,msg.token)){socket.send(JSON.stringify({type:'error',code:'UNAUTHORIZED',message:'Invalid bridge token'}));socket.close(1008,'Unauthorized');return;}key=registerConnectedFile(files,socket,key,msg);socket.send(JSON.stringify({type:'ready',fileKey:key}));}else if(msg.id&&pending.has(msg.id)){const p=pending.get(msg.id)!;clearTimeout(p.timer);pending.delete(msg.id);p.resolve(msg);}}catch{}});socket.on('close',()=>unregisterConnectedFile(files,socket,key));});
