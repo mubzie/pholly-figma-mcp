@@ -1,0 +1,20 @@
+{
+  "name": "pholly-figma-mcp",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Local-first MCP bridge for reading and editing live Figma documents",
+  "workspaces": ["packages/*", "apps/*"],
+  "scripts": {
+    "build": "npm run build -w @pholly/figma-protocol && npm run build -w @mubizzu/pholly-figma-mcp && npm run build -w @pholly/figma-plugin",
+    "dev": "npm run dev -w @mubizzu/pholly-figma-mcp",
+    "start": "node apps/server/dist/index.js",
+    "test": "npm run test -w @mubizzu/pholly-figma-mcp",
+    "typecheck": "tsc -b && npm run typecheck -w @pholly/figma-plugin",
+    "pack": "npm pack -w @mubizzu/pholly-figma-mcp"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "typescript": "^5.7.2"
+  },
+  "engines": {"node": ">=20"}
+}

@@ -1,0 +1,24 @@
+{
+  "name": "@mubizzu/pholly-figma-mcp",
+  "version": "0.1.0",
+  "description": "Local-first MCP bridge for reading and editing live Figma documents",
+  "license": "UNLICENSED",
+  "type": "module",
+  "bin": {"pholly-figma-mcp": "dist/index.js"},
+  "files": ["dist/", "plugin/"],
+  "publishConfig": {"access": "public"},
+  "scripts": {
+    "build": "tsc -b",
+    "dev": "tsx src/index.ts",
+    "test": "node --test dist/*.test.js",
+    "prepack": "tsc -b && npm run build -w @pholly/figma-plugin && node scripts/copy-plugin.mjs"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@pholly/figma-protocol": "0.1.0",
+    "@types/ws": "^8.5.13",
+    "tsx": "^4.19.2"
+  }
+}

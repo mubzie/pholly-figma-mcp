@@ -1,0 +1,12 @@
+{
+  "name": "Pholly Figma MCP",
+  "id": "pholly-figma-mcp-dev-1995",
+  "api": "1.0.0",
+  "main": "dist/code.js",
+  "ui": "dist/ui.html",
+  "editorType": ["figma"],
+  "networkAccess": {
+    "allowedDomains": ["http://localhost:1995", "ws://localhost:1995"],
+    "reasoning": "Connects to the local Pholly MCP bridge only."
+  }
+}
