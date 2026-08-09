@@ -36,6 +36,10 @@ MCP client ──stdio──> Node server ──WebSocket (localhost:1995)──
 
 The bridge is local-first: the plugin connects to `ws://localhost:1995/ws` on the same machine. Multiple MCP clients on one machine share the bridge; later starters automatically become followers that proxy to the leader.
 
+## Security
+
+The bridge binds to `127.0.0.1` and requires a bearer token for `/files`, `/rpc`, `/mcp`, and plugin registration. The token is generated per machine at `$XDG_CONFIG_HOME/pholly-figma-mcp/token` (override with `PHOLLY_TOKEN`), and `setup` stamps it into the plugin. HTTP requests from non-local `Host`s and WebSocket upgrades from non-local `Origin`s are rejected.
+
 ## Requirements
 
 - Node.js >= 20

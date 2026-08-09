@@ -10,6 +10,7 @@
     "start": "node apps/server/dist/index.js",
     "test": "npm run test -w @mubizzu/pholly-figma-mcp",
     "typecheck": "tsc -b && npm run typecheck -w @pholly/figma-plugin",
+    "setup": "node apps/server/dist/index.js setup",
     "pack": "npm pack -w @mubizzu/pholly-figma-mcp"
   },
   "devDependencies": {

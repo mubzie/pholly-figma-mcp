@@ -2,12 +2,18 @@ import type { ConnectedFile } from '@pholly/figma-protocol';
 
 export interface BridgeSocket {
   send(data: string): void;
+  readyState?: number;
 }
 
 export type ConnectedTarget<S extends BridgeSocket = BridgeSocket> = {
   socket: S;
   info: ConnectedFile;
 };
+
+export function isSocketOpen<S extends BridgeSocket>(socket: S): boolean {
+  if (socket.readyState === undefined) return true;
+  return socket.readyState === 1;
+}
 
 export function registerConnectedFile<S extends BridgeSocket>(
   files: Map<string, ConnectedTarget<S>>,
@@ -19,6 +25,10 @@ export function registerConnectedFile<S extends BridgeSocket>(
   const fileKey = typeof message.fileKey === 'string' && message.fileKey ? message.fileKey : previousKey;
   if (!fileKey) throw new Error('Connected file did not provide a file key');
   if (previousKey && previousKey !== fileKey && files.get(previousKey)?.socket === socket) files.delete(previousKey);
+  const existing = files.get(fileKey);
+  if (existing && existing.socket !== socket && isSocketOpen(existing.socket)) {
+    return fileKey;
+  }
   files.set(fileKey, {
     socket,
     info: {

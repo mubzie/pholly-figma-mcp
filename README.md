@@ -11,9 +11,10 @@ Usable MVP: MCP stdio transport, live plugin bridge, multi-file routing, documen
 ```bash
 npm install
 npm run build
+npm run setup          # creates ./pholly-figma-plugin with the bridge token baked in
 ```
 
-Import either `plugin/manifest.json` or `apps/plugin/manifest.json` into Figma through **Plugins → Development → Import plugin from manifest**, then run it in a design file. `npm run build` creates both valid layouts: the root `plugin/` folder has direct `code.js`/`ui.html`, while the source manifest points into `apps/plugin/dist/`.
+Import `pholly-figma-plugin/manifest.json` into Figma through **Plugins → Development → Import plugin from manifest**, then run it in a design file. The `setup` step is required: it stamps the machine's bridge token into the plugin, and the bridge rejects untrusted plugins. If the token ever changes (token file deleted or `PHOLLY_TOKEN` env overridden), re-run `setup` and re-import the manifest in Figma.
 
 ```json
 {
@@ -39,7 +40,7 @@ For clients that use `command`/`args` (e.g. codex-style config), the equivalent 
 }
 ```
 
-Your MCP client starts the server automatically. For bridge-only debugging you may run `npm start`; do not also launch a second manual copy unless you are testing follower behavior. The bridge stays on `localhost:1995`. Check it with `curl http://localhost:1995/ping` and `curl http://localhost:1995/files`.
+Your MCP client starts the server automatically. For bridge-only debugging you may run `npm start`; do not also launch a second manual copy unless you are testing follower behavior. The bridge stays on `localhost:1995`. Check it with `curl http://localhost:1995/ping` (the other endpoints require the bearer token).
 
 ## Architecture
 
@@ -61,22 +62,31 @@ The project is private by default but organized as independently licensed packag
 
 ## First-use checklist
 
-1. Run `npm install && npm run build`.
-2. Import `plugin/manifest.json` into Figma.
+1. Run `npm install && npm run build && npm run setup`.
+2. Import `pholly-figma-plugin/manifest.json` into Figma.
 3. Run the plugin in every file the agent should access.
 4. Restart the MCP client after adding the configuration.
 5. Ask the agent to call `list_files`; pass the returned `fileKey` for multi-file work.
 
 The plugin must be running in Figma's Design editor for write operations. Dev Mode is intentionally read-only.
 
+## Security
+
+The bridge is local-first and locked down by default:
+
+- The HTTP server and WebSocket bridge bind to `127.0.0.1` only.
+- A per-machine bearer token guards `/files`, `/rpc`, `/mcp`, and plugin registration. The token lives at `$XDG_CONFIG_HOME/pholly-figma-mcp/token` (mode `0600`) and can be overridden with the `PHOLLY_TOKEN` environment variable. The `setup` command stamps it into the plugin's `ui.html`; plugins without a valid token are rejected and closed.
+- HTTP requests with a non-local `Host` header are refused (blocks DNS-rebinding attacks), and WebSocket upgrades from non-local `Origin`s are rejected (blocks cross-site WebSocket hijacking from malicious web pages).
+- A connected file key can only be claimed by the plugin that currently owns it; a live registration is never overwritten by another connection.
+
 ## Packaging
 
-The server package is named `@mubizzu/pholly-figma-mcp`. `npm run pack` produces `mubizzu-pholly-figma-mcp-0.1.0.tgz` containing:
+The server package is named `@mubizzu/pholly-figma-mcp`. `npm run pack` produces `mubizzu-pholly-figma-mcp-0.1.1.tgz` containing:
 
 - `dist/` — the compiled MCP server with the `pholly-figma-mcp` binary
 - `plugin/` — the bundled Figma plugin (`code.js`, `ui.html`, `manifest.json`)
 
-The `setup` subcommand copies the bundled plugin into a project and prints the Figma import path:
+The `setup` subcommand copies the bundled plugin into a project, stamps the machine bridge token into it, and prints the Figma import path:
 
 ```bash
 pholly-figma-mcp setup [target-dir]   # default target: ./pholly-figma-plugin

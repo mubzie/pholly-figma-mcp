@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { registerConnectedFile, unregisterConnectedFile, type BridgeSocket, type ConnectedTarget } from './registry.js';
 
 const socket = (): BridgeSocket => ({send() {}});
+const closedSocket = (): BridgeSocket => ({send() {}, readyState: 3});
 
 test('registers connected file metadata', () => {
   const files = new Map<string, ConnectedTarget>();
@@ -21,14 +22,33 @@ test('replaces a temporary key when real metadata arrives', () => {
   assert.equal(files.get(realKey)?.info.name, 'LABs');
 });
 
-test('only removes a registration owned by the closing socket', () => {
+test('refuses to overwrite a key held by a live socket', () => {
   const files = new Map<string, ConnectedTarget>();
   const first = socket();
   const second = socket();
   registerConnectedFile(files, first, '', {fileKey:'file-1',name:'First'});
-  registerConnectedFile(files, second, '', {fileKey:'file-1',name:'Second'});
+  const key = registerConnectedFile(files, second, '', {fileKey:'file-1',name:'Attacker'});
+  assert.equal(key, 'file-1');
+  assert.equal(files.get('file-1')?.info.name, 'First');
+});
+
+test('allows takeover after the previous socket closed', () => {
+  const files = new Map<string, ConnectedTarget>();
+  registerConnectedFile(files, closedSocket(), '', {fileKey:'file-1',name:'First'});
+  registerConnectedFile(files, socket(), '', {fileKey:'file-1',name:'Second'});
+  assert.equal(files.get('file-1')?.info.name, 'Second');
+});
+
+test('only removes a registration owned by the closing socket', () => {
+  const files = new Map<string, ConnectedTarget>();
+  const first: BridgeSocket = {send() {}, readyState: 1};
+  registerConnectedFile(files, first, '', {fileKey:'file-1',name:'First'});
+  first.readyState = 3;
+  const replacement = socket();
+  registerConnectedFile(files, replacement, '', {fileKey:'file-1',name:'Second'});
+  assert.equal(files.get('file-1')?.info.name, 'Second');
   unregisterConnectedFile(files, first, 'file-1');
   assert.equal(files.get('file-1')?.info.name, 'Second');
-  unregisterConnectedFile(files, second, 'file-1');
+  unregisterConnectedFile(files, replacement, 'file-1');
   assert.equal(files.size, 0);
 });
