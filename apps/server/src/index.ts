@@ -110,7 +110,7 @@ if (!runSetup()) {
     }
   });
   wss.on('error',()=>{});
-  wss.on('connection',socket=>{let key='';socket.on('message',raw=>{try{const msg=JSON.parse(raw.toString());if(msg.type==='hello'){if(!tokenMatches(token,msg.token)){socket.send(JSON.stringify({type:'error',code:'UNAUTHORIZED',message:'Invalid bridge token'}));socket.close(1008,'Unauthorized');return;}key=registerConnectedFile(files,socket,key,msg);socket.send(JSON.stringify({type:'ready',fileKey:key}));}else if(msg.id&&pending.has(msg.id)){const p=pending.get(msg.id)!;clearTimeout(p.timer);pending.delete(msg.id);p.resolve(msg);}}catch{}});socket.on('close',()=>unregisterConnectedFile(files,socket,key));});
+  wss.on('connection',socket=>{let key='';socket.on('message',raw=>{try{const msg=JSON.parse(raw.toString());if(msg.type==='hello'){if(!tokenMatches(token,msg.token)){console.error(`pholly-figma-mcp: rejected hello for fileKey=${msg.fileKey} with an invalid token`);socket.send(JSON.stringify({type:'error',code:'UNAUTHORIZED',message:'Invalid bridge token'}));socket.close(1008,'Unauthorized');return;}key=registerConnectedFile(files,socket,key,msg);socket.send(JSON.stringify({type:'ready',fileKey:key}));}else if(msg.id&&pending.has(msg.id)){const p=pending.get(msg.id)!;clearTimeout(p.timer);pending.delete(msg.id);p.resolve(msg);}}catch{}});socket.on('close',()=>unregisterConnectedFile(files,socket,key));});
   async function handleMcp(q:any):Promise<any|null>{
     if(q.jsonrpc!=='2.0') return {jsonrpc:'2.0',id:q.id,error:{code:-32600,message:'Invalid JSON-RPC request'}};
     if(q.method==='initialize') return {jsonrpc:'2.0',id:q.id,result:{protocolVersion:'2024-11-05',capabilities:{tools:{}},serverInfo:{name:'pholly-figma-mcp',version:'0.1.1'}}};
