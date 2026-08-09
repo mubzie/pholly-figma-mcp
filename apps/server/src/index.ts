@@ -120,6 +120,7 @@ if (!runSetup()) {
   // MCP clients launch this package over stdio. Each input line is one JSON-RPC
   // request and each response is emitted as one JSON line on stdout.
   if (!process.stdin.isTTY || process.env.PHOLLY_STDIO === '1') {
+    process.stdin.on('error', () => {});
     let input = '';
     process.stdin.setEncoding('utf8');
     process.stdin.on('data', chunk => {
@@ -127,7 +128,9 @@ if (!runSetup()) {
       const lines = input.split('\n'); input = lines.pop() ?? '';
       for (const line of lines) {
         if (!line.trim()) continue;
-        void handleMcp(JSON.parse(line)).then(result => { if(result) process.stdout.write(`${JSON.stringify(result)}\n`); });
+        let request: any;
+        try { request = JSON.parse(line); } catch { continue; }
+        void handleMcp(request).then(result => { if(result) process.stdout.write(`${JSON.stringify(result)}\n`); });
       }
     });
   }
