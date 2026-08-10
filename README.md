@@ -61,6 +61,10 @@ The project is private by default but organized as independently licensed packag
 - `create_variable_collection`, `create_variable`, `set_variable_values`, and `bind_variable` support local design tokens.
 - `batch` runs safe, non-destructive operations sequentially. `delete_nodes` remains confirmation-gated.
 - `validate_design` checks a tree before rendering it; `commitUndo: true` on `render_design` creates a single undo checkpoint.
+- Editing: `set_gradient_fill` (linear/radial/angular/diamond), `set_effects` (shadows and blurs), `set_stroke_properties` (weight, alignment, dash, caps, joins), `set_node_visibility`, and `set_solid_fill` (hex or rgba).
+- Search: `find_nodes` and `find_text` match by substring or `/regex/`, optionally filtered by type and page.
+- Session: `get_path`, `undo`, `redo`, `get_changes`, and `clear_changes` keep agents oriented and auditable.
+- Export and analysis: `save_screenshots` writes explicit node lists to `public/figma-screenshots/`, and `extract_design_tokens` summarizes a page's typography, colors, radii, spacing, and opacities.
 
 ## First-use checklist
 

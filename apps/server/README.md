@@ -28,6 +28,18 @@ Local-first MCP bridge for reading and editing live Figma documents. A Figma plu
 
 3. Restart your MCP client, then ask your agent to call `list_files`, pick the returned `fileKey`, and use `get_metadata`, `get_selection`, `inspect_selection`, `render_design`, and the other tools.
 
+## Toolset overview
+
+- **Inspection**: `list_files`, `get_metadata`, `get_document`, `get_selection`, `get_node`, `get_design_context`, `get_styles`, `get_variable_defs`, `inspect_selection` (design-to-code spec + screenshot), `get_path`
+- **Editing**: `set_node_properties`, `set_text_content`, `set_text_properties`, `set_solid_fill`, `set_gradient_fill`, `set_effects`, `set_stroke_properties`, `set_node_visibility`, `set_auto_layout`, `set_selection`, `scroll_and_zoom_into_view`
+- **Authoring**: `create_frame`, `create_text`, `create_shape`, `create_image`, `render_design`, `validate_design`, `batch`, component/instance tools, variable tools, `duplicate_nodes`, `reparent_nodes`, `group_nodes`, `ungroup_node`, `delete_nodes` (confirm-gated)
+- **Search**: `find_nodes`, `find_text` (substring or `/regex/`)
+- **Session**: `undo`, `redo`, `get_changes`, `clear_changes`, `commit_undo`
+- **Export**: `export_selection_assets` (raster + vector assets to `public/figma-assets/`), `save_screenshots` (batch PNG/JPG to `public/figma-screenshots/`), `get_screenshot`
+- **Analysis**: `extract_design_tokens` (page typography, colors, radii, spacing, opacities)
+
+Run `tools/list` through your MCP client for full schemas.
+
 ## Architecture
 
 ```text
