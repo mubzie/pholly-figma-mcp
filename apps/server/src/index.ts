@@ -46,8 +46,11 @@ function runSetup(): boolean {
   }
   const token = getOrCreateToken();
   mkdirSync(target, { recursive: true });
-  copyFileSync(join(bundled, 'code.js'), join(target, 'code.js'));
-  copyFileSync(join(bundled, 'manifest.json'), join(target, 'manifest.json'));
+  const code = readFileSync(join(bundled, 'code.js'), 'utf8').replaceAll(TOKEN_PLACEHOLDER, token);
+  writeFileSync(join(target, 'code.js'), code);
+  const manifest = JSON.parse(readFileSync(join(bundled, 'manifest.json'), 'utf8'));
+  const stampedId = typeof manifest.id === 'string' && manifest.id ? `${manifest.id}-${token.slice(0, 8)}` : manifest.id;
+  writeFileSync(join(target, 'manifest.json'), JSON.stringify({...manifest, id: stampedId}, null, 2));
   const ui = readFileSync(join(bundled, 'ui.html'), 'utf8').replaceAll(TOKEN_PLACEHOLDER, token);
   writeFileSync(join(target, 'ui.html'), ui);
   console.log(`Pholly Figma plugin copied to ${target}`);
@@ -110,7 +113,7 @@ if (!runSetup()) {
     }
   });
   wss.on('error',()=>{});
-  wss.on('connection',socket=>{let key='';socket.on('message',raw=>{try{const msg=JSON.parse(raw.toString());if(msg.type==='hello'){if(!tokenMatches(token,msg.token)){console.error(`pholly-figma-mcp: rejected hello for fileKey=${msg.fileKey} with an invalid token`);socket.send(JSON.stringify({type:'error',code:'UNAUTHORIZED',message:'Invalid bridge token'}));socket.close(1008,'Unauthorized');return;}key=registerConnectedFile(files,socket,key,msg);socket.send(JSON.stringify({type:'ready',fileKey:key}));}else if(msg.id&&pending.has(msg.id)){const p=pending.get(msg.id)!;clearTimeout(p.timer);pending.delete(msg.id);p.resolve(msg);}}catch{}});socket.on('close',()=>unregisterConnectedFile(files,socket,key));});
+  wss.on('connection',socket=>{let key='';socket.on('message',raw=>{try{const msg=JSON.parse(raw.toString());if(msg.type==='hello'){if(!tokenMatches(token,msg.token)){const shown = typeof msg.token === 'string' && msg.token ? `${msg.token.slice(0,8)}…(${msg.token.length})` : '<missing>';console.error(`pholly-figma-mcp: rejected hello for fileKey=${msg.fileKey} token=${shown}`);socket.send(JSON.stringify({type:'error',code:'UNAUTHORIZED',message:'Invalid bridge token'}));socket.close(1008,'Unauthorized');return;}key=registerConnectedFile(files,socket,key,msg);socket.send(JSON.stringify({type:'ready',fileKey:key}));}else if(msg.id&&pending.has(msg.id)){const p=pending.get(msg.id)!;clearTimeout(p.timer);pending.delete(msg.id);p.resolve(msg);}}catch{}});socket.on('close',()=>unregisterConnectedFile(files,socket,key));});
   async function handleMcp(q:any):Promise<any|null>{
     if(q.jsonrpc!=='2.0') return {jsonrpc:'2.0',id:q.id,error:{code:-32600,message:'Invalid JSON-RPC request'}};
     if(q.method==='initialize') return {jsonrpc:'2.0',id:q.id,result:{protocolVersion:'2024-11-05',capabilities:{tools:{}},serverInfo:{name:'pholly-figma-mcp',version:'0.1.1'}}};
