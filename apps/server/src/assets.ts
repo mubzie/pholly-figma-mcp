@@ -78,8 +78,8 @@ export async function materializeAssetBundle(value: unknown, requestedDirectory?
   return {...metadata,outputDirectory:relativeDirectory,writtenAssets:written,failures};
 }
 
-function validateRelativeDirectory(value: unknown): string {
-  const raw = typeof value === 'string' && value.trim() ? value.trim().replaceAll('\\','/') : defaultOutputDirectory;
+function validateRelativeDirectory(value: unknown, fallback = defaultOutputDirectory): string {
+  const raw = typeof value === 'string' && value.trim() ? value.trim().replaceAll('\\','/') : fallback;
   if (path.posix.isAbsolute(raw) || path.win32.isAbsolute(raw)) throw new Error('Asset output directory must be project-relative');
   const parts = raw.split('/').filter(Boolean);
   if (!parts.length || parts.some(part => part === '..')) throw new Error('Asset output directory contains an unsafe path');
@@ -110,4 +110,59 @@ function sanitizeBaseName(value: string): string {
   const withoutExtension = value.replace(/\.[a-z0-9]{1,8}$/i, '');
   const slug = withoutExtension.normalize('NFKD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-zA-Z0-9]+/g, '-').replace(/^-+|-+$/g, '').toLowerCase();
   return (slug || 'figma-asset').slice(0, 80);
+}
+
+const screenshotExtensions: Record<string, string> = {PNG: '.png', JPG: '.jpg'};
+const defaultScreenshotDirectory = 'public/figma-screenshots';
+
+interface ScreenshotItem {
+  nodeId?: unknown;
+  name?: unknown;
+  format?: unknown;
+  base64?: unknown;
+}
+
+export async function materializeScreenshotBundle(value: unknown, requestedDirectory?: unknown, projectRoot = process.cwd()): Promise<unknown> {
+  if (!value || typeof value !== 'object') throw new Error('Figma screenshot export returned an invalid result');
+  const bundle = value as Record<string, unknown>;
+  if (!Array.isArray(bundle.screenshots)) throw new Error('Figma screenshot export did not include a screenshots array');
+  const root = path.resolve(projectRoot);
+  const relativeDirectory = validateRelativeDirectory(requestedDirectory, defaultScreenshotDirectory);
+  const destination = path.resolve(root, relativeDirectory);
+  const relativeCheck = path.relative(root, destination);
+  if (!relativeCheck || relativeCheck.startsWith('..') || path.isAbsolute(relativeCheck)) throw new Error('Screenshot output directory must stay inside the current project');
+  await mkdir(destination, {recursive:true});
+
+  const written: Array<Record<string, unknown>> = [];
+  const failures: Array<Record<string, unknown>> = Array.isArray(bundle.failures) ? [...bundle.failures] as Array<Record<string, unknown>> : [];
+  let totalBytes = 0;
+
+  for (const raw of bundle.screenshots as ScreenshotItem[]) {
+    try {
+      const format = typeof raw.format === 'string' ? raw.format.toUpperCase() : 'PNG';
+      const extension = screenshotExtensions[format];
+      if (!extension) throw new Error(`Unsupported screenshot format: ${format}`);
+      if (typeof raw.base64 !== 'string' || !raw.base64) throw new Error('Screenshot data is missing');
+      const bytes = Buffer.from(raw.base64, 'base64');
+      if (!bytes.length) throw new Error('Screenshot data is empty');
+      if (bytes.length > maxAssetBytes) throw new Error(`Screenshot exceeds the ${maxAssetBytes / 1024 / 1024} MB limit`);
+      totalBytes += bytes.length;
+      if (totalBytes > maxTotalBytes) throw new Error(`Screenshot bundle exceeds the ${maxTotalBytes / 1024 / 1024} MB limit`);
+      const hash = createHash('sha256').update(bytes).digest('hex');
+      const baseName = sanitizeBaseName(typeof raw.name === 'string' ? raw.name : String(raw.nodeId ?? 'figma-screenshot'));
+      const filePath = await writeWithoutOverwrite(destination, baseName, extension, bytes, hash);
+      written.push({
+        nodeId: raw.nodeId,
+        path: path.relative(root, filePath).split(path.sep).join('/'),
+        format,
+        bytes: bytes.length,
+        sha256: hash
+      });
+    } catch (error) {
+      failures.push({nodeId: raw.nodeId, message: error instanceof Error ? error.message : String(error)});
+    }
+  }
+
+  const {screenshots:_screenshots, ...metadata} = bundle;
+  return {...metadata, outputDirectory: relativeDirectory, writtenScreenshots: written, failures};
 }

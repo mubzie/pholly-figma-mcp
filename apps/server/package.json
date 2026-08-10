@@ -1,6 +1,6 @@
 {
   "name": "@mubizzu/pholly-figma-mcp",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "Local-first MCP bridge for reading and editing live Figma documents",
   "license": "UNLICENSED",
   "type": "module",

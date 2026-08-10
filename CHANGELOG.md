@@ -5,6 +5,22 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0] - 2026-08-10
+
+### Added
+- Editing parity tools: `set_gradient_fill` (LINEAR/RADIAL/ANGULAR/DIAMOND with stops and
+  transform), `set_effects` (drop/inner shadows, layer/background blurs), `set_stroke_properties`
+  (weight, alignment, dash, caps, joins, miter), and `set_node_visibility` (returns previous state)
+- `save_screenshots`: batch-export explicit node lists as PNG/JPG into a safe project directory
+- Search tools: `find_nodes` and `find_text` (substring or `/regex/`, optional type filter and page)
+- Session tools: `get_path`, `undo`, `redo`, `get_changes`, `clear_changes`
+- `extract_design_tokens`: summarize page typography, colors, radii, spacing, opacities, and node types
+- `set_solid_fill` now accepts hex colors in addition to rgba objects
+- Tests for color normalization, tool schemas, and screenshot writing (39 total)
+
+### Fixed
+- `set_solid_fill` color alpha is now clamped to the unit range
+
 ## [0.1.1] - 2026-08-09
 
 ### Added

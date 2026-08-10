@@ -9,7 +9,7 @@ import type { BridgeRequest, BridgeResponse, ConnectedFile } from '@pholly/figma
 import { tools } from './tools.js';
 import { registerConnectedFile, unregisterConnectedFile, type ConnectedTarget } from './registry.js';
 import { formatToolResult } from './content.js';
-import { materializeAssetBundle } from './assets.js';
+import { materializeAssetBundle, materializeScreenshotBundle } from './assets.js';
 import { getOrCreateToken, tokenMatches } from './token.js';
 
 const TOKEN_PLACEHOLDER = '__PHOLLY_TOKEN__';
@@ -119,7 +119,7 @@ if (!runSetup()) {
     if(q.method==='initialize') return {jsonrpc:'2.0',id:q.id,result:{protocolVersion:'2024-11-05',capabilities:{tools:{}},serverInfo:{name:'pholly-figma-mcp',version:'0.1.1'}}};
     if(q.method==='notifications/initialized') return null;
     if(q.method==='tools/list') return {jsonrpc:'2.0',id:q.id,result:{tools}};
-    if(q.method==='tools/call'){const name=q.params?.name;const args=q.params?.arguments??{};if(name==='list_files'){let connected=[...files.values()].map(x=>x.info);if(follower)try{connected=await (await fetch(`http://127.0.0.1:${port}/files`,{headers:{'authorization':`Bearer ${token}`}})).json() as ConnectedFile[];}catch{}return {jsonrpc:'2.0',id:q.id,result:{content:[{type:'text',text:JSON.stringify(connected,null,2)}]}};}let out=await rpc({method:name,fileKey:args.fileKey,params:args});if(name==='export_selection_assets'&&out.ok)try{out={...out,result:await materializeAssetBundle(out.result,args.outputDir)};}catch(error){out={id:out.id,ok:false,error:{code:'ASSET_WRITE_FAILED',message:error instanceof Error?error.message:String(error)}};}return {jsonrpc:'2.0',id:q.id,result:formatToolResult(name,out)};}
+    if(q.method==='tools/call'){const name=q.params?.name;const args=q.params?.arguments??{};if(name==='list_files'){let connected=[...files.values()].map(x=>x.info);if(follower)try{connected=await (await fetch(`http://127.0.0.1:${port}/files`,{headers:{'authorization':`Bearer ${token}`}})).json() as ConnectedFile[];}catch{}return {jsonrpc:'2.0',id:q.id,result:{content:[{type:'text',text:JSON.stringify(connected,null,2)}]}};}let out=await rpc({method:name,fileKey:args.fileKey,params:args});if(name==='export_selection_assets'&&out.ok)try{out={...out,result:await materializeAssetBundle(out.result,args.outputDir)};}catch(error){out={id:out.id,ok:false,error:{code:'ASSET_WRITE_FAILED',message:error instanceof Error?error.message:String(error)}};}if(name==='save_screenshots'&&out.ok)try{out={...out,result:await materializeScreenshotBundle(out.result,args.outputDir)};}catch(error){out={id:out.id,ok:false,error:{code:'ASSET_WRITE_FAILED',message:error instanceof Error?error.message:String(error)}};}return {jsonrpc:'2.0',id:q.id,result:formatToolResult(name,out)};}
     return {jsonrpc:'2.0',id:q.id,error:{code:-32601,message:`Method not found: ${q.method}`}};
   }
   http.on('error',(error:NodeJS.ErrnoException)=>{if(error.code==='EADDRINUSE'){follower=true;console.error(`pholly-figma-mcp using existing bridge on http://localhost:${port}`);}else{console.error(`pholly-figma-mcp could not open bridge port ${port}: ${error.message}`);}});
