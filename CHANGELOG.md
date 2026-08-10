@@ -1,0 +1,49 @@
+# Changelog
+
+All notable changes to this project are documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [0.1.1] - 2026-08-09
+
+### Added
+- `setup` now stamps the per-machine bridge token into both `code.js` and `ui.html`,
+  and assigns the plugin a unique per-machine ID
+- Rejection logging for unauthorized connections and invalid plugin hellos (masked token)
+- Integration and unit tests for token handling, HTTP auth, origin/host checks, and
+  registry protection (25 tests total)
+- Root `npm run setup` convenience script
+
+### Changed
+- Packaged as scoped `@mubizzu/pholly-figma-mcp` with `dist/` + bundled plugin in `files`,
+  `prepack` build, and npx-installable `setup`
+- Dev flow now imports the `setup`-generated `pholly-figma-plugin/manifest.json`
+  (raw build output is no longer an import target)
+
+### Fixed
+- `setup` stamped only `ui.html` while Figma actually runs the UI embedded in `code.js`,
+  leaving the plugin with the placeholder token and an endless reject loop
+- The file-info hello overwrote its own message type, so the real file key never
+  registered: `list_files` now returns the true key and the plugin chip reaches "Connected"
+- Crash (`EBADF`) when the server was launched from an interactive shell with `nohup`
+- Malformed JSON-RPC input lines no longer crash the stdio loop
+
+### Security
+- Per-machine bearer token guards `/files`, `/rpc`, `/mcp`, and plugin registration
+  (stored at `$XDG_CONFIG_HOME/pholly-figma-mcp/token`, mode `0600`; `PHOLLY_TOKEN` override)
+- WebSocket upgrades from non-local `Origin`s are rejected (cross-site WebSocket hijacking)
+- HTTP requests with a non-local `Host` header are refused (DNS-rebinding attacks)
+- A file key held by a live plugin connection can no longer be hijacked by another connection
+
+## [0.1.0] - 2026-08-09
+
+### Added
+- MCP stdio server with a local WebSocket bridge (`localhost:1995`) and follower
+  behavior for multiple MCP clients on one machine
+- Figma plugin with automatic reconnection
+- Design-to-code tooling: `inspect_selection`, `export_selection_assets`,
+  `render_design`, `batch`, component/instance authoring, variables, screenshots,
+  and node editing
+- Multi-file routing via `list_files` / `fileKey`
+- Initial npm publication as `@mubizzu/pholly-figma-mcp`

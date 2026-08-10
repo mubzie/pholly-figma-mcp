@@ -2,9 +2,11 @@
 
 Private, local-first MCP bridge for live Figma documents. It uses a Figma plugin and a local WebSocket server, so document inspection and edits do not consume Figma REST API requests.
 
+See [CHANGELOG.md](CHANGELOG.md) for release history.
+
 ## Status
 
-Usable MVP: MCP stdio transport, live plugin bridge, multi-file routing, document/style/variable inspection, common node editing, image creation, component/instance authoring, variable creation/binding, batch edits, and declarative tree rendering are included.
+Usable MVP (v0.1.1): MCP stdio transport, live plugin bridge, multi-file routing, document/style/variable inspection, common node editing, image creation, component/instance authoring, variable creation/binding, batch edits, and declarative tree rendering are included. The bridge is locked down with per-machine token authentication, origin/host validation, and plugin registration protection.
 
 ## Build and run
 
@@ -75,9 +77,15 @@ The plugin must be running in Figma's Design editor for write operations. Dev Mo
 The bridge is local-first and locked down by default:
 
 - The HTTP server and WebSocket bridge bind to `127.0.0.1` only.
-- A per-machine bearer token guards `/files`, `/rpc`, `/mcp`, and plugin registration. The token lives at `$XDG_CONFIG_HOME/pholly-figma-mcp/token` (mode `0600`) and can be overridden with the `PHOLLY_TOKEN` environment variable. The `setup` command stamps it into the plugin's `ui.html`; plugins without a valid token are rejected and closed.
+- A per-machine bearer token guards `/files`, `/rpc`, `/mcp`, and plugin registration. The token lives at `$XDG_CONFIG_HOME/pholly-figma-mcp/token` (mode `0600`) and can be overridden with the `PHOLLY_TOKEN` environment variable. The `setup` command stamps it into the plugin's `code.js` and `ui.html` and assigns a unique per-machine plugin ID; plugins without a valid token are rejected and closed.
 - HTTP requests with a non-local `Host` header are refused (blocks DNS-rebinding attacks), and WebSocket upgrades from non-local `Origin`s are rejected (blocks cross-site WebSocket hijacking from malicious web pages).
 - A connected file key can only be claimed by the plugin that currently owns it; a live registration is never overwritten by another connection.
+
+## Troubleshooting
+
+- **Plugin loops between "Connecting…" and "Disconnected · retrying"**: the plugin in Figma is stale (Figma caches imports under the plugin ID). Delete the plugin entry under **Plugins → Development**, re-run `setup`, and re-import the generated `pholly-figma-plugin/manifest.json`.
+- **`list_files` returns `[]`**: the plugin is not connected. Make sure it is running in a design file and the status chip shows "Connected".
+- **Bridge rejects with "Invalid bridge token"**: the imported plugin was stamped for a different token. Re-run `setup` on the same machine the bridge runs on, then re-import.
 
 ## Packaging
 

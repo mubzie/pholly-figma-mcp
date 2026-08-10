@@ -10,7 +10,7 @@ Local-first MCP bridge for reading and editing live Figma documents. A Figma plu
    npx -y @mubizzu/pholly-figma-mcp setup
    ```
 
-   This copies the plugin into `./pholly-figma-plugin/`. Import its `manifest.json` in Figma via **Plugins → Development → Import plugin from manifest**, then run the plugin in the design file you want to share with your agent.
+   This copies the plugin into `./pholly-figma-plugin/` and stamps it with your machine's bridge token (each machine gets its own token and plugin ID). Import its `manifest.json` in Figma via **Plugins → Development → Import plugin from manifest**, then run the plugin in the design file you want to share with your agent.
 
 2. Configure the MCP server in your client (opencode, codex, etc.):
 
@@ -38,7 +38,9 @@ The bridge is local-first: the plugin connects to `ws://localhost:1995/ws` on th
 
 ## Security
 
-The bridge binds to `127.0.0.1` and requires a bearer token for `/files`, `/rpc`, `/mcp`, and plugin registration. The token is generated per machine at `$XDG_CONFIG_HOME/pholly-figma-mcp/token` (override with `PHOLLY_TOKEN`), and `setup` stamps it into the plugin. HTTP requests from non-local `Host`s and WebSocket upgrades from non-local `Origin`s are rejected.
+The bridge binds to `127.0.0.1` and requires a bearer token for `/files`, `/rpc`, `/mcp`, and plugin registration. The token is generated per machine at `$XDG_CONFIG_HOME/pholly-figma-mcp/token` (override with `PHOLLY_TOKEN`), and `setup` stamps it into the plugin's `code.js` and `ui.html`. HTTP requests from non-local `Host`s and WebSocket upgrades from non-local `Origin`s are rejected.
+
+See the repository `CHANGELOG.md` for release history.
 
 ## Requirements
 
