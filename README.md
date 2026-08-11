@@ -1,6 +1,6 @@
 # pholly-figma-mcp
 
-Private, local-first MCP bridge for live Figma documents. It uses a Figma plugin and a local WebSocket server, so document inspection and edits do not consume Figma REST API requests.
+Local-first MCP bridge for live Figma documents. It uses a Figma plugin and a local WebSocket server, so document inspection and edits do not consume Figma REST API requests.
 
 See [CHANGELOG.md](CHANGELOG.md) for release history.
 
@@ -50,7 +50,7 @@ Your MCP client starts the server automatically. For bridge-only debugging you m
 MCP client ──stdio──> Node server ──WebSocket──> Figma plugin ──> Figma Plugin API
 ```
 
-The project is private by default but organized as independently licensed packages to make future open-sourcing straightforward.
+The project is organized as independently licensed packages under the [MIT License](LICENSE). See [CONTRIBUTING.md](CONTRIBUTING.md) for how to get involved and [SECURITY.md](SECURITY.md) for vulnerability reporting.
 
 ## Notable tools
 

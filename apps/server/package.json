@@ -1,8 +1,14 @@
 {
   "name": "@mubizzu/pholly-figma-mcp",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Local-first MCP bridge for reading and editing live Figma documents",
-  "license": "UNLICENSED",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mubzie/pholly-figma-mcp.git"
+  },
+  "homepage": "https://github.com/mubzie/pholly-figma-mcp",
+  "bugs": {"url": "https://github.com/mubzie/pholly-figma-mcp/issues"},
   "type": "module",
   "bin": {"pholly-figma-mcp": "dist/index.js"},
   "files": ["dist/", "plugin/"],
