@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, statSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { getOrCreateToken, tokenMatches } from './token.js';
+import { bridgeMac, getOrCreateToken, macMatches, tokenMatches } from './token.js';
 
 const dir = mkdtempSync(join(tmpdir(), 'pholly-token-test-'));
 const configHome = join(dir, 'config');
@@ -35,6 +35,15 @@ test('honours the PHOLLY_TOKEN environment override', () => {
     if (previous === undefined) delete process.env.PHOLLY_TOKEN;
     else process.env.PHOLLY_TOKEN = previous;
   }
+});
+
+test('bridgeMac is bound to the nonce and label', () => {
+  const nonce = 'a'.repeat(64);
+  const mac = bridgeMac('secret', nonce, 'file-1');
+  assert.equal(macMatches(mac, mac), true);
+  assert.equal(macMatches(mac, bridgeMac('secret', nonce, 'file-2')), false);
+  assert.equal(macMatches(mac, bridgeMac('other', nonce, 'file-1')), false);
+  assert.equal(macMatches(mac, undefined), false);
 });
 
 test('tokenMatches rejects mismatches and missing values', () => {

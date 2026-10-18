@@ -10,6 +10,8 @@ export type ConnectedTarget<S extends BridgeSocket = BridgeSocket> = {
   info: ConnectedFile;
 };
 
+export type Registration = { fileKey: string; accepted: boolean };
+
 export function isSocketOpen<S extends BridgeSocket>(socket: S): boolean {
   if (socket.readyState === undefined) return true;
   return socket.readyState === 1;
@@ -21,14 +23,14 @@ export function registerConnectedFile<S extends BridgeSocket>(
   previousKey: string,
   message: Record<string, unknown>,
   connectedAt = Date.now()
-): string {
+): Registration {
   const fileKey = typeof message.fileKey === 'string' && message.fileKey ? message.fileKey : previousKey;
   if (!fileKey) throw new Error('Connected file did not provide a file key');
-  if (previousKey && previousKey !== fileKey && files.get(previousKey)?.socket === socket) files.delete(previousKey);
   const existing = files.get(fileKey);
   if (existing && existing.socket !== socket && isSocketOpen(existing.socket)) {
-    return fileKey;
+    return { fileKey, accepted: false };
   }
+  if (previousKey && previousKey !== fileKey && files.get(previousKey)?.socket === socket) files.delete(previousKey);
   files.set(fileKey, {
     socket,
     info: {
@@ -40,7 +42,7 @@ export function registerConnectedFile<S extends BridgeSocket>(
       connectedAt
     }
   });
-  return fileKey;
+  return { fileKey, accepted: true };
 }
 
 export function unregisterConnectedFile<S extends BridgeSocket>(
@@ -49,4 +51,11 @@ export function unregisterConnectedFile<S extends BridgeSocket>(
   fileKey: string
 ): void {
   if (fileKey && files.get(fileKey)?.socket === socket) files.delete(fileKey);
+}
+
+/** One missed pong is tolerated; the next ping with no pong drops the socket. */
+export function nextLiveness(awaitingPong: boolean, event: 'ping' | 'pong'): { awaitingPong: boolean; drop: boolean } {
+  if (event === 'pong') return { awaitingPong: false, drop: false };
+  if (awaitingPong) return { awaitingPong: true, drop: true };
+  return { awaitingPong: true, drop: false };
 }

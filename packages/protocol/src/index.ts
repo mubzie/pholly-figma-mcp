@@ -26,7 +26,7 @@ export interface ConnectedFile {
 export interface DesignNode {
   id?: string;
   key?: string;
-  type: 'FRAME' | 'SECTION' | 'GROUP' | 'TEXT' | 'RECTANGLE' | 'ELLIPSE' | 'LINE' | 'COMPONENT' | 'INSTANCE';
+  type: 'FRAME' | 'TEXT' | 'RECTANGLE' | 'ELLIPSE' | 'LINE';
   name?: string;
   content?: string;
   componentId?: string;

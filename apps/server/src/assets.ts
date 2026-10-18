@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, realpath, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
 const defaultOutputDirectory = 'public/figma-assets';
@@ -28,12 +28,8 @@ export async function materializeAssetBundle(value: unknown, requestedDirectory?
   if (!value || typeof value !== 'object') throw new Error('Figma asset export returned an invalid result');
   const bundle = value as Record<string, unknown>;
   if (!Array.isArray(bundle.assets)) throw new Error('Figma asset export did not include an assets array');
-  const root = path.resolve(projectRoot);
-  const relativeDirectory = validateRelativeDirectory(requestedDirectory);
-  const destination = path.resolve(root, relativeDirectory);
-  const relativeCheck = path.relative(root, destination);
-  if (!relativeCheck || relativeCheck.startsWith('..') || path.isAbsolute(relativeCheck)) throw new Error('Asset output directory must stay inside the current project');
-  await mkdir(destination, {recursive:true});
+  const output = await resolveOutputDirectory(requestedDirectory, defaultOutputDirectory, projectRoot);
+  const {root, relativeDirectory, destination} = output;
 
   const written: Array<Record<string, unknown>> = [];
   const failures: Array<Record<string, unknown>> = Array.isArray(bundle.failures) ? [...bundle.failures] as Array<Record<string, unknown>> : [];
@@ -76,6 +72,20 @@ export async function materializeAssetBundle(value: unknown, requestedDirectory?
 
   const {assets:_assets,...metadata} = bundle;
   return {...metadata,outputDirectory:relativeDirectory,writtenAssets:written,failures};
+}
+
+async function resolveOutputDirectory(requested: unknown, fallback: string, projectRoot: string): Promise<{root: string; relativeDirectory: string; destination: string}> {
+  const root = path.resolve(projectRoot);
+  const relativeDirectory = validateRelativeDirectory(requested, fallback);
+  const lexicalDestination = path.resolve(root, relativeDirectory);
+  const lexical = path.relative(root, lexicalDestination);
+  if (!lexical || lexical.startsWith('..') || path.isAbsolute(lexical)) throw new Error('Asset output directory must stay inside the current project');
+  await mkdir(lexicalDestination, {recursive:true});
+  const rootReal = await realpath(root);
+  const destination = await realpath(lexicalDestination);
+  const resolved = path.relative(rootReal, destination);
+  if (!resolved || resolved.split(path.sep).includes('..') || path.isAbsolute(resolved)) throw new Error('Asset output directory must stay inside the current project');
+  return {root: rootReal, relativeDirectory, destination};
 }
 
 function validateRelativeDirectory(value: unknown, fallback = defaultOutputDirectory): string {
@@ -126,12 +136,8 @@ export async function materializeScreenshotBundle(value: unknown, requestedDirec
   if (!value || typeof value !== 'object') throw new Error('Figma screenshot export returned an invalid result');
   const bundle = value as Record<string, unknown>;
   if (!Array.isArray(bundle.screenshots)) throw new Error('Figma screenshot export did not include a screenshots array');
-  const root = path.resolve(projectRoot);
-  const relativeDirectory = validateRelativeDirectory(requestedDirectory, defaultScreenshotDirectory);
-  const destination = path.resolve(root, relativeDirectory);
-  const relativeCheck = path.relative(root, destination);
-  if (!relativeCheck || relativeCheck.startsWith('..') || path.isAbsolute(relativeCheck)) throw new Error('Screenshot output directory must stay inside the current project');
-  await mkdir(destination, {recursive:true});
+  const output = await resolveOutputDirectory(requestedDirectory, defaultScreenshotDirectory, projectRoot);
+  const {root, relativeDirectory, destination} = output;
 
   const written: Array<Record<string, unknown>> = [];
   const failures: Array<Record<string, unknown>> = Array.isArray(bundle.failures) ? [...bundle.failures] as Array<Record<string, unknown>> : [];

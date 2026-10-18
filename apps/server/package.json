@@ -1,6 +1,6 @@
 {
   "name": "@mubizzu/pholly-figma-mcp",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Local-first MCP bridge for reading and editing live Figma documents",
   "license": "MIT",
   "repository": {
@@ -16,7 +16,7 @@
   "scripts": {
     "build": "tsc -b",
     "dev": "tsx src/index.ts",
-    "test": "node --test dist/*.test.js",
+    "test": "node --test --test-concurrency=1 dist/*.test.js",
     "prepack": "tsc -b && npm run build -w @pholly/figma-plugin && node scripts/copy-plugin.mjs"
   },
   "dependencies": {

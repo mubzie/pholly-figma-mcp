@@ -34,7 +34,7 @@ Local-first MCP bridge for reading and editing live Figma documents. A Figma plu
 - **Editing**: `set_node_properties`, `set_text_content`, `set_text_properties`, `set_solid_fill`, `set_gradient_fill`, `set_effects`, `set_stroke_properties`, `set_node_visibility`, `set_auto_layout`, `set_selection`, `scroll_and_zoom_into_view`
 - **Authoring**: `create_frame`, `create_text`, `create_shape`, `create_image`, `render_design`, `validate_design`, `batch`, component/instance tools, variable tools, `duplicate_nodes`, `reparent_nodes`, `group_nodes`, `ungroup_node`, `delete_nodes` (confirm-gated)
 - **Search**: `find_nodes`, `find_text` (substring or `/regex/`)
-- **Session**: `undo`, `redo`, `get_changes`, `clear_changes`, `commit_undo`
+- **Session**: `undo` (last committed bridge edit), `redo` (not available in the plugin API; use the editor command), `get_changes`, `clear_changes`, `commit_undo`
 - **Export**: `export_selection_assets` (raster + vector assets to `public/figma-assets/`), `save_screenshots` (batch PNG/JPG to `public/figma-screenshots/`), `get_screenshot`
 - **Analysis**: `extract_design_tokens` (page typography, colors, radii, spacing, opacities)
 
@@ -50,7 +50,7 @@ The bridge is local-first: the plugin connects to `ws://localhost:1995/ws` on th
 
 ## Security
 
-The bridge binds to `127.0.0.1` and requires a bearer token for `/files`, `/rpc`, `/mcp`, and plugin registration. The token is generated per machine at `$XDG_CONFIG_HOME/pholly-figma-mcp/token` (override with `PHOLLY_TOKEN`), and `setup` stamps it into the plugin's `code.js` and `ui.html`. HTTP requests from non-local `Host`s and WebSocket upgrades from non-local `Origin`s are rejected.
+The bridge binds to `127.0.0.1` and requires a bearer token for `/files`, `/rpc`, and `/mcp`. Plugin registration uses an HMAC challenge instead of sending that token. The token is generated per machine at `$XDG_CONFIG_HOME/pholly-figma-mcp/token` (override with `PHOLLY_TOKEN`), and `setup` stamps it into the plugin as mode `0600`. HTTP requests with a missing or non-local `Host`, and WebSocket upgrades from non-local `Origin`s, are rejected. When more than one file is connected, tool calls must include `fileKey`.
 
 See the repository `CHANGELOG.md` for release history.
 

@@ -18,7 +18,7 @@ the MCP server (see the README) to develop against a live document.
 - **Branches**: feature work happens on a branch off `main` (e.g. `0.3.0-feature-name`).
   Nothing lands on `main` until it has been verified against a live Figma document.
 - **Verify**: `npm run build`, `npm run typecheck`, and `npm run test` must all pass
-  (39 tests: unit + integration).
+  (server unit and integration tests, plus plugin policy tests).
 - **Live verification**: plugin-side changes require re-running `setup` and re-importing
   the manifest in Figma before a merge.
 - **Changelog**: update `CHANGELOG.md` (keep-a-changelog format) with the version entry.

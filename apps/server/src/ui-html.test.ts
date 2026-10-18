@@ -7,17 +7,35 @@ import { dirname, join } from 'node:path';
 const here = dirname(fileURLToPath(import.meta.url));
 const ui = readFileSync(join(here, '..', '..', 'plugin', 'src', 'ui.html'), 'utf8');
 
-test('file-info hello keeps the message type as hello', () => {
-  const line = ui.split('\n').find(l => l.includes("type==='file-info'"));
-  assert.ok(line, 'file-info handler exists in ui.html');
-  assert.ok(line.includes('const {type:_drop,...fileInfo}=m'), 'file-info type is destructured out of the payload');
-  assert.ok(line.includes("{type:'hello',...fileInfo,token}"), 'hello message keeps its type after the spread');
-  assert.ok(!line.includes("{type:'hello',...m,"), 'raw payload spread must never overwrite the message type');
+test('file-info hello keeps the message type as hello-begin', () => {
+  assert.match(ui, /const \{type:_drop,\.\.\.fileInfo\}=m/);
+  assert.match(ui, /beginHello\(fileInfo\.fileKey,fileInfo\)/);
+  assert.doesNotMatch(ui, /\{type:'hello',\.\.\.m/);
+  assert.doesNotMatch(ui, /\{type:'hello',\.\.\.fileInfo,token\}/);
 });
 
-test('fallback hello carries the bridge token', () => {
-  const line = ui.split('\n').find(l => l.includes('fileKey:fallbackKey'));
-  assert.ok(line, 'fallback hello exists in ui.html');
-  assert.match(line, /type:'hello'/);
-  assert.match(line, /token/);
+test('registration proves the token instead of sending it', () => {
+  assert.match(ui, /type:'hello-begin'/);
+  assert.match(ui, /hmacSha256Hex\(token,/);
+  assert.match(ui, /type:'hello',nonce:m\.nonce,mac,fileKey/);
+  assert.doesNotMatch(ui, /type:'hello',token/);
+  assert.match(ui, /\/\*__BRIDGE_HMAC__\*\//);
+});
+
+test('a busy file is reported instead of a successful connection', () => {
+  assert.match(ui, /FILE_BUSY/);
+  assert.match(ui, /another plugin window/);
+});
+
+test('the identity card is not part of the plugin UI', () => {
+  assert.doesNotMatch(ui, /class="card identity"/);
+  assert.doesNotMatch(ui, /\.identity\{/);
+  assert.doesNotMatch(ui, /min-width:320px/);
+  assert.match(ui, /width:max-content/);
+  assert.match(ui, /min-width:250px/);
+  assert.match(ui, /\.workspace\{[^}]*width:100%/);
+  assert.match(ui, /\.workspace\{[^}]*grid-template-columns:minmax\(0,1fr\)/);
+  assert.doesNotMatch(ui, /grid-template-columns:max-content/);
+  assert.match(ui, /Math\.max\(250/);
+  assert.match(ui, /type:'resize'/);
 });

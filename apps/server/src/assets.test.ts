@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, readFile, rm, writeFile, mkdir } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, writeFile, mkdir, symlink } from 'node:fs/promises';
 import path from 'node:path';
 import { tmpdir } from 'node:os';
 import { materializeAssetBundle, materializeScreenshotBundle } from './assets.js';
@@ -43,6 +43,31 @@ test('writes screenshots into the default directory with png extension', async (
     assert.equal(await readFile(path.join(root, result.writtenScreenshots[0].path), 'utf8'), 'pngbytes');
     assert.equal('base64' in result.writtenScreenshots[0], false);
   } finally { await rm(root,{recursive:true,force:true}); }
+});
+
+test('rejects a symlink that points outside the project', async () => {
+  const root = await mkdtemp(path.join(tmpdir(), 'pholly-assets-'));
+  const outside = await mkdtemp(path.join(tmpdir(), 'pholly-outside-'));
+  try {
+    await symlink(outside, path.join(root, 'escape'));
+    await assert.rejects(() => materializeAssetBundle({assets:[{assetKey:'x',suggestedName:'pwned',mimeType:'image/svg+xml',base64:Buffer.from('<svg/>').toString('base64')}]}, 'escape', root), /inside the current project/);
+    await assert.rejects(() => readFile(path.join(outside, 'pwned.svg'), 'utf8'), {code:'ENOENT'});
+  } finally {
+    await rm(root, {recursive:true, force:true});
+    await rm(outside, {recursive:true, force:true});
+  }
+});
+
+test('allows a symlink that stays inside the project', async () => {
+  const root = await mkdtemp(path.join(tmpdir(), 'pholly-assets-'));
+  try {
+    const realDir = path.join(root, 'real-assets');
+    await mkdir(realDir, {recursive:true});
+    await symlink(realDir, path.join(root, 'linked-assets'));
+    const result = await materializeAssetBundle({assets:[{assetKey:'x',suggestedName:'icon',mimeType:'image/svg+xml',base64:Buffer.from('<svg/>').toString('base64')}]}, 'linked-assets', root) as any;
+    assert.equal(await readFile(path.join(realDir, 'icon.svg'), 'utf8'), '<svg/>');
+    assert.match(result.writtenAssets[0].path, /icon\.svg$/);
+  } finally { await rm(root, {recursive:true, force:true}); }
 });
 
 test('screenshot failures are reported and do not abort the bundle', async () => {

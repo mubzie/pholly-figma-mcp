@@ -1,4 +1,4 @@
-import { randomBytes } from 'node:crypto';
+import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
@@ -35,7 +35,15 @@ export function tokenMatches(expected: string, provided: string | undefined | nu
   const a = Buffer.from(expected);
   const b = Buffer.from(provided);
   if (a.length !== b.length) return false;
-  let diff = 0;
-  for (let i = 0; i < a.length; i++) diff |= a[i] ^ b[i];
-  return diff === 0;
+  return timingSafeEqual(a, b);
+}
+
+/** HMAC-SHA256 over `nonce.label`. The label is the file key, or `leader` for follower proofs. */
+export function bridgeMac(token: string, nonce: string, label: string): string {
+  return createHmac('sha256', token).update(`${nonce}.${label}`).digest('hex');
+}
+
+export function macMatches(expected: string, provided: unknown): boolean {
+  if (typeof provided !== 'string' || provided.length !== expected.length) return false;
+  return timingSafeEqual(Buffer.from(expected), Buffer.from(provided));
 }

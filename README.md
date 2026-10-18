@@ -6,7 +6,7 @@ See [CHANGELOG.md](CHANGELOG.md) for release history.
 
 ## Status
 
-Usable MVP (v0.1.1): MCP stdio transport, live plugin bridge, multi-file routing, document/style/variable inspection, common node editing, image creation, component/instance authoring, variable creation/binding, batch edits, and declarative tree rendering are included. The bridge is locked down with per-machine token authentication, origin/host validation, and plugin registration protection.
+Usable MVP (v0.2.2): MCP stdio transport, live plugin bridge, multi-file routing, document/style/variable inspection, common node editing, image creation, component/instance authoring, variable creation/binding, batch edits, declarative tree rendering, editing parity (gradient fills, effects, strokes, visibility), search, screenshots, and design-token extraction are included. The bridge is locked down with per-machine token authentication, origin/host validation, and plugin registration protection.
 
 ## Build and run
 
@@ -81,9 +81,9 @@ The plugin must be running in Figma's Design editor for write operations. Dev Mo
 The bridge is local-first and locked down by default:
 
 - The HTTP server and WebSocket bridge bind to `127.0.0.1` only.
-- A per-machine bearer token guards `/files`, `/rpc`, `/mcp`, and plugin registration. The token lives at `$XDG_CONFIG_HOME/pholly-figma-mcp/token` (mode `0600`) and can be overridden with the `PHOLLY_TOKEN` environment variable. The `setup` command stamps it into the plugin's `code.js` and `ui.html` and assigns a unique per-machine plugin ID; plugins without a valid token are rejected and closed.
-- HTTP requests with a non-local `Host` header are refused (blocks DNS-rebinding attacks), and WebSocket upgrades from non-local `Origin`s are rejected (blocks cross-site WebSocket hijacking from malicious web pages).
-- A connected file key can only be claimed by the plugin that currently owns it; a live registration is never overwritten by another connection.
+- A per-machine bearer token guards `/files`, `/rpc`, and `/mcp`. The token lives at `$XDG_CONFIG_HOME/pholly-figma-mcp/token` (mode `0600`) and can be overridden with the `PHOLLY_TOKEN` environment variable. `setup` stamps it into the plugin and writes those files mode `0600`. The plugin proves it knows the token with an HMAC challenge; the raw token is not sent over the WebSocket.
+- HTTP requests with a missing or non-local `Host` header are refused (blocks DNS-rebinding attacks), and WebSocket upgrades from non-local `Origin`s are rejected (blocks cross-site WebSocket hijacking from malicious web pages).
+- A connected file key can only be claimed by the plugin that currently owns it. A second window is told the file is busy instead of being marked connected. Pass `fileKey` whenever more than one file is connected.
 
 ## Troubleshooting
 
@@ -93,7 +93,7 @@ The bridge is local-first and locked down by default:
 
 ## Packaging
 
-The server package is named `@mubizzu/pholly-figma-mcp`. `npm run pack` produces `mubizzu-pholly-figma-mcp-0.1.1.tgz` containing:
+The server package is named `@mubizzu/pholly-figma-mcp`. `npm run pack` produces `mubizzu-pholly-figma-mcp-0.2.2.tgz` containing:
 
 - `dist/` — the compiled MCP server with the `pholly-figma-mcp` binary
 - `plugin/` — the bundled Figma plugin (`code.js`, `ui.html`, `manifest.json`)

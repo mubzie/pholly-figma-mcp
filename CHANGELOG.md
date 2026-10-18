@@ -5,6 +5,27 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.2] - 2026-09-25
+
+### Fixed
+- `create_image` no longer follows a redirect onto a link-local, metadata, or private address, and it stops reading once the body passes 15 MB
+- Stamped plugin ids use a hash prefix instead of the first bytes of the bridge token. The dev build keeps the token placeholder and warns to import the setup copy
+- Plugin registration that loses the file key race no longer receives `ready`. A dead WebSocket is dropped when it misses a ping, so a reconnect can take the file back
+- `undo` calls `figma.triggerUndo()`. `redo` reports that the plugin API has no redo instead of calling a missing method
+- Bridge edits are committed to Figma's undo stack once per tool call (`batch` is one step). `render_design` commits unless `commitUndo` is `false`
+- `render_design` validates the tree first, rejects unsupported node types instead of creating rectangles, and reconcile removes keyed children that were omitted
+- `create_text` loads a font before writing characters and accepts `content`, `characters`, or `text`
+- `delete_nodes` accepts only boolean `true`. Document reads clamp depth to 12. `get_node` errors when the id is missing
+- Asset and screenshot writes resolve symlinks and refuse a directory that escapes the project
+- A second connected file no longer receives edits that omitted `fileKey`
+- `create_image` downloads http(s) URLs in the bridge. The plugin allowlist stays limited to localhost
+
+### Security
+- Plugin hello is a one-round HMAC challenge. The raw bridge token is no longer sent on the WebSocket
+- Follower processes prove the leader knows the token before they send it, and refuse a port 1995 listener that cannot
+- `setup` writes the stamped plugin as mode `0600` inside a `0700` directory
+- HTTP requests with a missing `Host` header are rejected, including `/ping`
+
 ## [0.2.1] - 2026-08-10
 
 ### Changed
