@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { createServer, type ServerResponse, type IncomingMessage } from 'node:http';
+import { createServer, type Server, type ServerResponse, type IncomingMessage } from 'node:http';
 import { WebSocketServer, WebSocket } from 'ws';
 import { randomBytes, randomUUID } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
@@ -27,7 +27,7 @@ type PendingRpc = { resolve: (response: BridgeResponse) => void; timer: NodeJS.T
 function isLocalHost(host: string | undefined): boolean {
   if (!host) return false;
   const hostname = host.replace(/:\d+$/, '').replace(/^\[|\]$/g, '').toLowerCase();
-  return hostname === 'localhost' || hostname === '127.0.0.1';
+  return hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1';
 }
 
 function isAllowedOrigin(origin: string | undefined): boolean {
@@ -35,7 +35,7 @@ function isAllowedOrigin(origin: string | undefined): boolean {
   if (origin === 'null') return true;
   try {
     const url = new URL(origin);
-    return (url.hostname === 'localhost' || url.hostname === '127.0.0.1') &&
+    return (url.hostname === 'localhost' || url.hostname === '127.0.0.1' || url.hostname === '::1') &&
       (url.protocol === 'http:' || url.protocol === 'https:');
   } catch {
     return false;
@@ -186,7 +186,7 @@ if (!runSetup()) {
     }
     return JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}');
   }
-  const http = createServer(async (req, res) => {
+  const handleHttp = async (req: IncomingMessage, res: ServerResponse) => {
     try {
       if (!isLocalHost(req.headers.host)) return sendJson(res, 403, { error: 'Forbidden' });
       const url = new URL(req.url ?? '/', 'http://127.0.0.1');
@@ -205,21 +205,36 @@ if (!runSetup()) {
       if (url.pathname === '/mcp' && req.method === 'POST') { const requestBody = await body(req); const result = await handleMcp(requestBody); return sendJson(res, 200, result); }
       return sendJson(res, 404, { error: 'Not found' });
     } catch (error) { return sendJson(res, 400, { error: String(error) }); }
-  });
-  const wss = new WebSocketServer({
-    server: http,
-    path: '/ws',
-    verifyClient: (info: { origin: string; secure: boolean; req: IncomingMessage }) => {
-      const hostOk = isLocalHost(info.req.headers.host);
-      const originOk = isAllowedOrigin(info.origin);
-      if (!hostOk || !originOk) console.error(`pholly-figma-mcp: rejected WebSocket upgrade from host=${info.req.headers.host} origin=${info.origin}`);
-      return hostOk && originOk;
-    }
-  });
+  };
+  const http = createServer(handleHttp);
+  /*
+   * The plugin dials the host name `localhost`. On many systems that resolves
+   * to ::1 first, while the IPv4 listener below holds 127.0.0.1. Bind both
+   * loopback addresses so the name cannot split across the two stacks. The
+   * IPv6 listener is best effort; the ready MAC still protects the plugin if a
+   * squatter wins one of the loopback addresses.
+   */
+  function attachBridge(server: Server): WebSocketServer {
+    const attached = new WebSocketServer({
+      server,
+      path: '/ws',
+      verifyClient: (info: { origin: string; secure: boolean; req: IncomingMessage }) => {
+        const hostOk = isLocalHost(info.req.headers.host);
+        const originOk = isAllowedOrigin(info.origin);
+        if (!hostOk || !originOk) console.error(`pholly-figma-mcp: rejected WebSocket upgrade from host=${info.req.headers.host} origin=${info.origin}`);
+        return hostOk && originOk;
+      }
+    });
+    attached.on('error', () => {});
+    attached.on('connection', handleConnection);
+    return attached;
+  }
+  const wss = attachBridge(http);
+  let wss6: WebSocketServer | undefined;
   const awaitingPong = new WeakMap<WebSocket, boolean>();
   const challenges = new WeakMap<WebSocket, { nonce: string; serverNonce: string; fileKey: string; message: Record<string, unknown> }>();
   const pingTimer = setInterval(() => {
-    for (const client of [...wss.clients]) {
+    for (const client of [...wss.clients, ...(wss6?.clients ?? [])]) {
       const next = nextLiveness(awaitingPong.get(client) ?? false, 'ping');
       if (next.drop) { client.terminate(); continue; }
       awaitingPong.set(client, next.awaitingPong);
@@ -227,8 +242,7 @@ if (!runSetup()) {
     }
   }, pingMs);
   pingTimer.unref();
-  wss.on('error', () => {});
-  wss.on('connection', socket => {
+  function handleConnection(socket: WebSocket): void {
     let key = '';
     awaitingPong.set(socket, false);
     socket.on('error', () => { try { socket.terminate(); } catch { /* already closed */ } });
@@ -310,7 +324,7 @@ if (!runSetup()) {
       unregisterConnectedFile(files, socket, key);
       failPendingFor(socket, 'PLUGIN_DISCONNECTED', 'The Figma plugin disconnected before the request finished.');
     });
-  });
+  }
   function protocolVersionFor(clientVersion: unknown): string {
     return typeof clientVersion === 'string' && supportedProtocolVersions.has(clientVersion) ? clientVersion : '2024-11-05';
   }
@@ -374,6 +388,10 @@ if (!runSetup()) {
   http.listen(port, '127.0.0.1', () => {
     console.error(`pholly-figma-mcp listening on http://localhost:${port}`);
     settleMode('leader');
+    const http6 = createServer(handleHttp);
+    wss6 = attachBridge(http6);
+    http6.on('error', () => { /* IPv6 loopback is optional */ });
+    http6.listen(port, '::1', () => console.error(`pholly-figma-mcp listening on http://[::1]:${port}`));
   });
 
   // MCP clients launch this package over stdio. Each input line is one JSON-RPC

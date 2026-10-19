@@ -32,7 +32,7 @@ test('the plugin does not run a method until the server proves the token', () =>
 });
 
 test('the plugin dials loopback on the stamped port', () => {
-  assert.match(ui, /ws:\/\/127\.0\.0\.1:__PHOLLY_PORT__\/ws/);
+  assert.match(ui, /ws:\/\/localhost:__PHOLLY_PORT__\/ws/);
   assert.doesNotMatch(ui, /ws:\/\/localhost:1995/);
 });
 

@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.3.0] - 2026-10-19
 
 ### Security
-- The plugin now verifies the server. `ready` carries a MAC over the plugin's challenge nonce and a server nonce, and the plugin drops any `method` frame until that MAC verifies. A local process that accepts `ws://127.0.0.1:<port>` can no longer read or edit the open Figma file without the token.
+- The plugin now verifies the server. `ready` carries a MAC over the plugin's challenge nonce and a server nonce, and the plugin drops any `method` frame until that MAC verifies. A local process that accepts `ws://localhost:<port>` can no longer read or edit the open Figma file without the token.
 - HMAC purposes are domain-separated (`prove`, `hello`, `ready`). The unauthenticated `/prove` MAC can no longer register a plugin. The file key `leader` is reserved.
 - Followers re-prove the leader before every request and stop sending the bearer token if the proof fails.
 - `create_image` blocks loopback, private, link-local, and metadata addresses on the first request and on redirects, and caps data URIs. `PHOLLY_ALLOW_PRIVATE_IMAGE_HOSTS=1` is the explicit escape hatch.

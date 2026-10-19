@@ -10,8 +10,8 @@
   "enablePrivatePluginApi": true,
   "networkAccess": {
     "allowedDomains": [
-      "http://127.0.0.1:__PHOLLY_PORT__",
-      "ws://127.0.0.1:__PHOLLY_PORT__"
+      "http://localhost:__PHOLLY_PORT__",
+      "ws://localhost:__PHOLLY_PORT__"
     ],
     "reasoning": "Connects to the local Pholly MCP bridge on the loopback address only."
   }

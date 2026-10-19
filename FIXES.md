@@ -7,7 +7,7 @@ Verification on this machine (WSL, Node v22.23.2, npm 10.9.8):
 - `npm run build` exit 0.
 - `npm run typecheck` exit 0.
 - `npm test` pass: 66 server tests, 7 plugin tests.
-- Clean clone (`npm ci`, build, test, setup) exit 0, plugin copied by the root build, no `__PHOLLY_TOKEN__` in the stamped output, port `127.0.0.1:1995` stamped.
+- Clean clone (`npm ci`, build, test, setup) exit 0, plugin copied by the root build, no `__PHOLLY_TOKEN__` in the stamped output, port `localhost:1995` stamped.
 
 ## Protocol checks after the fix
 
@@ -25,7 +25,7 @@ Verification on this machine (WSL, Node v22.23.2, npm 10.9.8):
 
 | Finding | Status | What changed | Evidence |
 |---|---|---|---|
-| SEC-001 plugin does not authenticate the server | Fixed | `ready` now carries a MAC over both nonces; the plugin drops `method` frames until it verifies; setup stamps `ws://127.0.0.1:<port>` | [ui.html](apps/plugin/src/ui.html), [index.ts](apps/server/src/index.ts), [token.ts](apps/server/src/token.ts) |
+| SEC-001 plugin does not authenticate the server | Fixed | `ready` now carries a MAC over both nonces; the plugin drops `method` frames until it verifies; setup stamps `ws://localhost:<port>` and the server binds both loopback addresses | [ui.html](apps/plugin/src/ui.html), [index.ts](apps/server/src/index.ts), [token.ts](apps/server/src/token.ts) |
 | REL-001 npm install is 0.2.1 | Mitigated | Version bumped to 0.3.0; README says npm is stale and the handshake is incompatible | [README.md](README.md), [CHANGELOG.md](CHANGELOG.md) |
 | SEC-002 `/prove` MAC registers `leader` | Fixed | MAC domains separated; `leader` file key rejected | [token.ts](apps/server/src/token.ts), [index.ts](apps/server/src/index.ts) |
 | REL-002 clean clone setup fails | Fixed | Root build ends with `copy-plugin.mjs`; setup error text no longer suggests a manual step | [package.json](package.json) |

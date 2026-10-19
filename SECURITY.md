@@ -1,6 +1,6 @@
 # Security Policy
 
-The bridge is local-first and binds to `127.0.0.1` only. The controls below are the ones the source actually implements:
+The bridge is local-first and binds to `127.0.0.1` and `::1` only. The controls below are the ones the source actually implements:
 
 - A bearer token guards `/files`, `/rpc`, and `/mcp`. `/ping` is open and `/prove` returns a proof MAC, not the token.
 - Plugin registration proves knowledge of the token with HMAC-SHA256. The raw token is not sent on the WebSocket.

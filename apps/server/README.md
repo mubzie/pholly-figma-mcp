@@ -52,7 +52,7 @@ The bridge is local-first: the plugin connects to `ws://localhost:1995/ws` on th
 
 ## Security
 
-The bridge binds to `127.0.0.1` and requires a bearer token for `/files`, `/rpc`, and `/mcp`. Plugin registration uses an HMAC challenge instead of sending that token, and `ready` carries a MAC that proves the server to the plugin; until it verifies, the plugin ignores command frames. `setup` stamps the token and the bridge port into the plugin. HTTP requests with a missing or non-local `Host`, and WebSocket upgrades from non-local `Origin`s, are rejected. When more than one file is connected, tool calls must include `fileKey`. Images fetched by `create_image` may not target loopback, private, link-local, or metadata addresses.
+The bridge binds to both loopback addresses (`127.0.0.1` and `::1`) and requires a bearer token for `/files`, `/rpc`, and `/mcp`. Plugin registration uses an HMAC challenge instead of sending that token, and `ready` carries a MAC that proves the server to the plugin; until it verifies, the plugin ignores command frames. `setup` stamps the token and the bridge port into the plugin. HTTP requests with a missing or non-local `Host`, and WebSocket upgrades from non-local `Origin`s, are rejected. When more than one file is connected, tool calls must include `fileKey`. Images fetched by `create_image` may not target loopback, private, link-local, or metadata addresses.
 
 See the repository `CHANGELOG.md` for release history.
 

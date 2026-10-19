@@ -84,11 +84,11 @@ The plugin must be running in Figma's Design editor for write operations. Dev Mo
 
 The bridge is local-first and locked down by default:
 
-- The HTTP server and WebSocket bridge bind to `127.0.0.1` only.
+- The HTTP server and WebSocket bridge bind to `127.0.0.1` and `::1` only. The IPv6 listener is best effort, so the plugin keeps working on IPv4-only machines.
 - A per-machine bearer token guards `/files`, `/rpc`, and `/mcp`. The token lives at `$XDG_CONFIG_HOME/pholly-figma-mcp/token` (falling back to `~/.config/pholly-figma-mcp/token`) and can be overridden with `PHOLLY_TOKEN`.
 - The plugin proves it knows the token with an HMAC challenge. The raw token is not sent on the WebSocket.
-- The server also proves it knows the token: `ready` carries a MAC over both the plugin's challenge nonce and a server nonce that the plugin sent. Until that MAC verifies, the plugin drops any frame with a `method`. A process that merely accepts `ws://127.0.0.1:1995` cannot make the plugin read or edit a document.
-- Setup stamps `ws://127.0.0.1:<port>` and the matching `networkAccess` allowlist into the plugin, so a non-default `PHOLLY_PORT` still matches. The plugin no longer dials the name `localhost`, which can split across IPv4 and IPv6.
+- The server also proves it knows the token: `ready` carries a MAC over both the plugin's challenge nonce and a server nonce that the plugin sent. Until that MAC verifies, the plugin drops any frame with a `method`. A process that merely accepts `ws://localhost:1995` cannot make the plugin read or edit a document.
+- Setup stamps `ws://localhost:<port>` and the matching `networkAccess` allowlist into the plugin, so a non-default `PHOLLY_PORT` still matches. The host name is `localhost` because Figma's manifest validator rejects IP literals in `allowedDomains`; the server binds both loopback addresses so the name cannot split across IPv4 and IPv6.
 - MAC domains are separate for `prove`, `hello`, and `ready`. A `/prove` MAC cannot register a plugin, and the file key `leader` is reserved and rejected.
 - HTTP requests with a missing or non-local `Host` header are refused (blocks DNS rebinding), and WebSocket upgrades from non-local `Origin`s are rejected.
 - A connected file key can only be claimed by the plugin that currently owns it. A second window is told the file is busy.
@@ -106,7 +106,7 @@ This bridge does not send telemetry. When an agent calls an inspection or export
 ## Requirements
 
 - Node.js >= 20. The compiled server runs on Node 20; tests use `tsx` so they do not require Node's experimental type stripping.
-- The Figma desktop app with the plugin running for write operations. Figma web may block a `ws://127.0.0.1` connection under its own network policy; this was not verified.
+- The Figma desktop app with the plugin running for write operations. Figma web may block a `ws://localhost` connection under its own network policy; this was not verified.
 
 ## WSL
 
@@ -146,4 +146,4 @@ A published package is configured exactly like any npx server:
 }
 ```
 
-The bridge remains local-first: the plugin in Figma connects to `ws://127.0.0.1:<port>` on the same machine. Multiple MCP clients on one machine share the bridge; later starters become followers that proxy to the leader. A follower refuses to send the bearer token to a process that cannot prove it knows it, and re-checks that proof.
+The bridge remains local-first: the plugin in Figma connects to `ws://localhost:<port>` on the same machine. Multiple MCP clients on one machine share the bridge; later starters become followers that proxy to the leader. A follower refuses to send the bearer token to a process that cannot prove it knows it, and re-checks that proof.

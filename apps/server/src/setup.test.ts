@@ -38,11 +38,11 @@ test('setup stamps the bridge port and refuses an invalid one', () => {
   try {
     mkdirSync(bundled);
     writeFileSync(join(bundled, 'code.js'), 'token');
-    writeFileSync(join(bundled, 'ui.html'), `const endpoint='ws://127.0.0.1:${PORT_PLACEHOLDER}/ws';`);
-    writeFileSync(join(bundled, 'manifest.json'), JSON.stringify({ id: 'pholly', networkAccess: { allowedDomains: [`ws://127.0.0.1:${PORT_PLACEHOLDER}`] } }));
+    writeFileSync(join(bundled, 'ui.html'), `const endpoint='ws://localhost:${PORT_PLACEHOLDER}/ws';`);
+    writeFileSync(join(bundled, 'manifest.json'), JSON.stringify({ id: 'pholly', networkAccess: { allowedDomains: [`ws://localhost:${PORT_PLACEHOLDER}`] } }));
     stampPlugin(bundled, target, 'b'.repeat(64), 2777);
-    assert.match(readFileSync(join(target, 'ui.html'), 'utf8'), /127\.0\.0\.1:2777/);
-    assert.match(readFileSync(join(target, 'manifest.json'), 'utf8'), /127\.0\.0\.1:2777/);
+    assert.match(readFileSync(join(target, 'ui.html'), 'utf8'), /localhost:2777/);
+    assert.match(readFileSync(join(target, 'manifest.json'), 'utf8'), /localhost:2777/);
     assert.doesNotMatch(readFileSync(join(target, 'ui.html'), 'utf8'), /__PHOLLY_PORT__/);
     assert.throws(() => stampPlugin(bundled, join(root, 'bad'), 'b'.repeat(64), 0), /invalid bridge port/);
   } finally {
