@@ -1,0 +1,40 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Node ${{ matrix.node }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: ['20', '22']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - run: npm run typecheck
+      - run: npm test
+      - name: Clean-clone setup contract
+        run: |
+          rm -rf /tmp/pholly-clone
+          mkdir -p /tmp/pholly-clone
+          tar --exclude node_modules --exclude dist --exclude pholly-figma-plugin \
+            --exclude apps/server/plugin --exclude '*.tsbuildinfo' -cf - . | tar -C /tmp/pholly-clone -xf -
+          cd /tmp/pholly-clone
+          npm ci
+          npm run build
+          PHOLLY_TOKEN=ci-setup-token npm run setup
+          test -f pholly-figma-plugin/manifest.json
+          ! grep -q __PHOLLY_TOKEN__ pholly-figma-plugin/ui.html

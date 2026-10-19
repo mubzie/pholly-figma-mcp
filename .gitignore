@@ -6,3 +6,4 @@ node_modules/
 apps/server/plugin/
 pholly-figma-plugin/
 *.tgz
+.llm-wiki/

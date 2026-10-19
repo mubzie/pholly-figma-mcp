@@ -4,7 +4,7 @@ import { BlockList, isIP } from 'node:net';
 const maxImageBytes = 15 * 1024 * 1024;
 const maxRedirects = 5;
 const mimePattern = /^[\w.+-]+\/[\w.+-]+$/;
-const metadataNames = new Set(['metadata.google.internal']);
+const metadataNames = new Set(['metadata.google.internal', 'metadata', 'instance-data']);
 
 const linkLocal = new BlockList();
 linkLocal.addSubnet('169.254.0.0', 16, 'ipv4');
@@ -13,13 +13,21 @@ linkLocal.addSubnet('fe80::', 10, 'ipv6');
 const inward = new BlockList();
 inward.addSubnet('0.0.0.0', 8, 'ipv4');
 inward.addSubnet('10.0.0.0', 8, 'ipv4');
+inward.addSubnet('100.64.0.0', 10, 'ipv4');
 inward.addSubnet('127.0.0.0', 8, 'ipv4');
 inward.addSubnet('169.254.0.0', 16, 'ipv4');
 inward.addSubnet('172.16.0.0', 12, 'ipv4');
+inward.addSubnet('192.0.0.0', 24, 'ipv4');
 inward.addSubnet('192.168.0.0', 16, 'ipv4');
+inward.addSubnet('198.18.0.0', 15, 'ipv4');
+inward.addSubnet('240.0.0.0', 4, 'ipv4');
+inward.addAddress('::', 'ipv6');
 inward.addAddress('::1', 'ipv6');
 inward.addSubnet('fc00::', 7, 'ipv6');
 inward.addSubnet('fe80::', 10, 'ipv6');
+inward.addSubnet('ff00::', 8, 'ipv6');
+
+const privateHosts = new Set(['localhost', 'localhost.localdomain', 'ip6-localhost', 'ip6-loopback']);
 
 function normalizedIp(address: string): { address: string; family: 'ipv4' | 'ipv6' } | null {
   const mapped = address.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/i);
@@ -29,10 +37,27 @@ function normalizedIp(address: string): { address: string; family: 'ipv4' | 'ipv
   return null;
 }
 
-async function assertFetchable(url: URL, redirect: boolean): Promise<void> {
-  const host = url.hostname.replace(/\.$/, '').toLowerCase();
+function allowPrivateHosts(): boolean {
+  return process.env.PHOLLY_ALLOW_PRIVATE_IMAGE_HOSTS === '1';
+}
+
+/*
+ * Every hop, including the first, is checked. The previous version allowed
+ * loopback and RFC1918 hosts on the initial URL and only blocked them after a
+ * redirect, which made `create_image` a blind SSRF primitive.
+ */
+async function assertFetchable(url: URL, fetcher: typeof fetch): Promise<void> {
+  const host = url.hostname.replace(/\.$/, '').replace(/^\[|\]$/g, '').toLowerCase();
   if (!host) throw new Error('Image host is missing');
+  const literal = normalizedIp(host);
+  if (literal) {
+    if (allowPrivateHosts()) return;
+    if (linkLocal.check(literal.address, literal.family)) throw new Error('Image host is a link-local address');
+    if (inward.check(literal.address, literal.family)) throw new Error('Image host is a private address');
+    return;
+  }
   if (metadataNames.has(host)) throw new Error('Image host is a metadata address');
+  if (privateHosts.has(host)) throw new Error('Image host is a private address');
   let records: { address: string }[];
   try {
     records = await lookup(host, { all: true, verbatim: true });
@@ -40,12 +65,14 @@ async function assertFetchable(url: URL, redirect: boolean): Promise<void> {
     throw new Error('Image host could not be resolved');
   }
   if (!records.length) throw new Error('Image host could not be resolved');
+  if (allowPrivateHosts()) return;
   for (const record of records) {
     const ip = normalizedIp(record.address);
     if (!ip) throw new Error('Image host did not resolve to an IP address');
     if (linkLocal.check(ip.address, ip.family)) throw new Error('Image host is a link-local address');
-    if (redirect && inward.check(ip.address, ip.family)) throw new Error('Image redirect targets a private address');
+    if (inward.check(ip.address, ip.family)) throw new Error('Image host is a private address');
   }
+  void fetcher;
 }
 
 async function readLimited(response: Response): Promise<Buffer> {
@@ -73,15 +100,24 @@ async function readLimited(response: Response): Promise<Buffer> {
   return Buffer.concat(chunks.map(chunk => Buffer.from(chunk)), total);
 }
 
+function dataUriBytes(src: string): number {
+  const comma = src.indexOf(',');
+  if (comma < 0) return 0;
+  return Math.floor(((src.length - comma - 1) * 3) / 4);
+}
+
 export async function inlineImageSource(src: unknown, fetcher: typeof fetch = fetch): Promise<string> {
   if (typeof src !== 'string' || !src.trim()) throw new Error('create_image requires src');
-  if (src.startsWith('data:')) return src;
+  if (src.startsWith('data:')) {
+    if (dataUriBytes(src) > maxImageBytes) throw new Error('Image exceeds the 15 MB limit');
+    return src;
+  }
   let url: URL;
   try { url = new URL(src); } catch { throw new Error('create_image src must be an http(s) URL or a data URI'); }
   if (url.protocol !== 'http:' && url.protocol !== 'https:') throw new Error('create_image only accepts http(s) URLs or data URIs');
   let response: Response | undefined;
   for (let redirects = 0; ; redirects += 1) {
-    await assertFetchable(url, redirects > 0);
+    await assertFetchable(url, fetcher);
     response = await fetcher(url, { redirect: 'manual', signal: AbortSignal.timeout(15_000) });
     const redirected = response.status >= 300 && response.status < 400 && response.status !== 304;
     if (!redirected) break;

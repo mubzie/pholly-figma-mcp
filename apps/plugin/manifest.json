@@ -4,9 +4,15 @@
   "api": "1.0.0",
   "main": "dist/code.js",
   "ui": "dist/ui.html",
-  "editorType": ["figma"],
+  "editorType": [
+    "figma"
+  ],
+  "enablePrivatePluginApi": true,
   "networkAccess": {
-    "allowedDomains": ["http://localhost:1995", "ws://localhost:1995"],
-    "reasoning": "Connects to the local Pholly MCP bridge only."
+    "allowedDomains": [
+      "http://127.0.0.1:__PHOLLY_PORT__",
+      "ws://127.0.0.1:__PHOLLY_PORT__"
+    ],
+    "reasoning": "Connects to the local Pholly MCP bridge on the loopback address only."
   }
 }

@@ -17,9 +17,23 @@ test('file-info hello keeps the message type as hello-begin', () => {
 test('registration proves the token instead of sending it', () => {
   assert.match(ui, /type:'hello-begin'/);
   assert.match(ui, /hmacSha256Hex\(token,/);
-  assert.match(ui, /type:'hello',nonce:m\.nonce,mac,fileKey/);
+  assert.match(ui, /type:'hello',nonce:m\.nonce,serverNonce:m\.serverNonce,mac,fileKey/);
   assert.doesNotMatch(ui, /type:'hello',token/);
   assert.match(ui, /\/\*__BRIDGE_HMAC__\*\//);
+});
+
+test('the plugin does not run a method until the server proves the token', () => {
+  assert.match(ui, /verifyReady/);
+  assert.match(ui, /serverVerified/);
+  assert.match(ui, /if\(!serverVerified\)/);
+  assert.match(ui, /UNVERIFIED_BRIDGE/);
+  assert.match(ui, /ready\\u0000/);
+  assert.match(ui, /hello\\u0000/);
+});
+
+test('the plugin dials loopback on the stamped port', () => {
+  assert.match(ui, /ws:\/\/127\.0\.0\.1:__PHOLLY_PORT__\/ws/);
+  assert.doesNotMatch(ui, /ws:\/\/localhost:1995/);
 });
 
 test('a busy file is reported instead of a successful connection', () => {
