@@ -10,7 +10,7 @@
     "test": "node --import tsx --test src/policy.test.ts src/bridge-hmac.test.ts"
   },
   "devDependencies": {
-    "@figma/plugin-typings": "^1.107.0",
+    "@figma/plugin-typings": "^1.142.0",
     "esbuild": "^0.25.12",
     "tsx": "^4.19.2"
   },
