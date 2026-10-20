@@ -30,11 +30,11 @@
     "prepack": "tsc -b && npm run build -w @pholly/figma-plugin && node scripts/copy-plugin.mjs"
   },
   "dependencies": {
-    "ws": "^8.18.0"
+    "ws": "^8.22.0"
   },
   "devDependencies": {
     "@pholly/figma-protocol": "0.1.0",
-    "@types/ws": "^8.5.13",
+    "@types/ws": "^8.18.2",
     "tsx": "^4.19.2"
   },
   "engines": {
