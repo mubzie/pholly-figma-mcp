@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, statSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { bridgeMac, getOrCreateToken, macMatches, tokenMatches } from './token.js';
+import { bridgeMac, getOrCreateToken, macMatches, readyMac, tokenMatches } from './token.js';
 
 const dir = mkdtempSync(join(tmpdir(), 'pholly-token-test-'));
 const configHome = join(dir, 'config');
@@ -37,13 +37,29 @@ test('honours the PHOLLY_TOKEN environment override', () => {
   }
 });
 
-test('bridgeMac is bound to the nonce and label', () => {
+test('bridgeMac is bound to the domain, nonce, and label', () => {
   const nonce = 'a'.repeat(64);
-  const mac = bridgeMac('secret', nonce, 'file-1');
+  const mac = bridgeMac('secret', 'hello', nonce, 'file-1');
   assert.equal(macMatches(mac, mac), true);
-  assert.equal(macMatches(mac, bridgeMac('secret', nonce, 'file-2')), false);
-  assert.equal(macMatches(mac, bridgeMac('other', nonce, 'file-1')), false);
+  assert.equal(macMatches(mac, bridgeMac('secret', 'hello', nonce, 'file-2')), false);
+  assert.equal(macMatches(mac, bridgeMac('secret', 'hello', 'b'.repeat(64), 'file-1')), false);
+  assert.equal(macMatches(mac, bridgeMac('other', 'hello', nonce, 'file-1')), false);
   assert.equal(macMatches(mac, undefined), false);
+});
+
+test('a prove MAC cannot be used as a hello MAC for the same nonce and label', () => {
+  const nonce = 'a'.repeat(64);
+  const prove = bridgeMac('secret', 'prove', nonce, 'leader');
+  const hello = bridgeMac('secret', 'hello', nonce, 'leader');
+  assert.notEqual(prove, hello);
+  assert.equal(macMatches(hello, prove), false);
+});
+
+test('ready MAC is bound to both nonces and the file key', () => {
+  const mac = readyMac('secret', 'c'.repeat(64), 'd'.repeat(64), 'file-1');
+  assert.equal(macMatches(mac, readyMac('secret', 'c'.repeat(64), 'd'.repeat(64), 'file-1')), true);
+  assert.equal(macMatches(mac, readyMac('secret', 'e'.repeat(64), 'd'.repeat(64), 'file-1')), false);
+  assert.equal(macMatches(mac, readyMac('secret', 'c'.repeat(64), 'd'.repeat(64), 'file-2')), false);
 });
 
 test('tokenMatches rejects mismatches and missing values', () => {

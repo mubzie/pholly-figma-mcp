@@ -34,21 +34,95 @@ body{margin:0;width:max-content;min-width:250px;background:#0c1224;color:#f5f7ff
       <div class="meta-row"><span class="meta-label">Selection</span><strong class="meta-value" id="selection">0 nodes</strong></div>
     </div>
   </section>
-  <footer class="footer"><div class="status-chip" id="statusChip" data-state="connecting"><span class="status-dot"></span><span id="statusText">Connecting…</span></div><span class="build">0.2.2 · 1995</span></footer>
+  <footer class="footer"><div class="status-chip" id="statusChip" data-state="connecting"><span class="status-dot"></span><span id="statusText">Connecting…</span></div><span class="build">0.3.0 · 1995</span></footer>
 </main>
 <script>
 /*__BRIDGE_HMAC__*/
-const endpoint='ws://localhost:1995/ws';const token='__PHOLLY_TOKEN__';const fallbackKey=`figma-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;const statusChip=document.getElementById('statusChip');const statusText=document.getElementById('statusText');const fileName=document.getElementById('fileName');const pageName=document.getElementById('pageName');const selection=document.getElementById('selection');let ws;let info;let registrationTimer;let inflightKey='';let busy=false;const pendingMethods=new Map();
+const endpoint='ws://localhost:__PHOLLY_PORT__/ws';
+const token='__PHOLLY_TOKEN__';
+const fallbackKey=`figma-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+const statusChip=document.getElementById('statusChip');
+const statusText=document.getElementById('statusText');
+const fileName=document.getElementById('fileName');
+const pageName=document.getElementById('pageName');
+const selection=document.getElementById('selection');
+let ws;
+let info;
+let registrationTimer;
+let inflightKey='';
+let busy=false;
+let lastHello=null;
+let serverVerified=false;
+const pendingMethods=new Map();
 const busyText='This file is open in another plugin window · retrying';
-const panel=document.querySelector('.panel');let hugWidth=0;let hugHeight=0;
+const panel=document.querySelector('.panel');
+let hugWidth=0;
+let hugHeight=0;
 function hug(){const width=Math.max(250,Math.ceil(panel.getBoundingClientRect().width));const height=Math.ceil(panel.getBoundingClientRect().height);if(!width||!height||(width===hugWidth&&height===hugHeight))return;hugWidth=width;hugHeight=height;parent.postMessage({pluginMessage:{type:'resize',width,height}},'*');}
 function setStatus(text,state){statusText.textContent=text;statusText.title=text;statusChip.dataset.state=state;hug();}
 function requestFileInfo(){parent.postMessage({pluginMessage:{type:'ready'}},'*');}
 function stopRegistration(){if(registrationTimer){clearInterval(registrationTimer);registrationTimer=undefined;}}
 function updateFileInfo(m){info=m;if(typeof m.name==='string'){fileName.textContent=m.name;fileName.classList.remove('muted');fileName.title=m.name;}if(typeof m.pageName==='string'){pageName.textContent=m.pageName;pageName.classList.remove('muted');pageName.title=m.pageName;}hug();}
-function beginHello(fileKey,meta){if(ws?.readyState!==1||!fileKey)return;if(fileKey===inflightKey)return;inflightKey=fileKey;ws.send(JSON.stringify({type:'hello-begin',fileKey,...meta}));}
-function connect(){stopRegistration();inflightKey='';busy=false;setStatus('Connecting…','connecting');try{ws=new WebSocket(endpoint);}catch(error){setStatus('Connection blocked','error');setTimeout(connect,1500);return;}ws.onopen=()=>{setStatus('Registering file…','connecting');beginHello(fallbackKey,{name:'Figma document',editorType:'figma'});requestFileInfo();registrationTimer=setInterval(requestFileInfo,500);};ws.onerror=()=>setStatus('Bridge unavailable','error');ws.onclose=()=>{stopRegistration();inflightKey='';const retryBusy=busy;busy=false;setStatus(retryBusy?busyText:'Disconnected · retrying','error');setTimeout(connect,1500);};ws.onmessage=e=>{let m;try{m=JSON.parse(e.data);}catch{return;}if(m.type==='challenge'&&typeof m.nonce==='string'){const fileKey=inflightKey;if(!fileKey)return;const mac=hmacSha256Hex(token,`${m.nonce}.${fileKey}`);if(fileKey===inflightKey&&ws.readyState===1)ws.send(JSON.stringify({type:'hello',nonce:m.nonce,mac,fileKey}));return;}if(m.type==='error'&&m.code==='FILE_BUSY'){busy=true;setStatus(busyText,'error');return;}if(m.type==='ready'){inflightKey='';if(info&&m.fileKey===info.fileKey){stopRegistration();busy=false;setStatus('Connected','connected');}return;}if(m.method){pendingMethods.set(m.id,m.method);parent.postMessage({pluginMessage:{type:'request',id:m.id,method:m.method,params:m.params}},'*');}};}
-window.onmessage=e=>{const m=e.data.pluginMessage;if(m?.type==='selection'&&typeof m.count==='number'){selection.textContent=`${m.count} node${m.count===1?'':'s'}`;hug();}if(m?.type==='file-info'){updateFileInfo(m);if(ws?.readyState===1){const {type:_drop,...fileInfo}=m;beginHello(fileInfo.fileKey,fileInfo);}}if(m?.type==='response'&&ws?.readyState===1){const method=pendingMethods.get(m.id);pendingMethods.delete(m.id);if(method==='get_selection'&&m.ok&&Array.isArray(m.result))selection.textContent=`${m.result.length} node${m.result.length===1?'':'s'}`;if(method==='inspect_selection'&&m.ok&&typeof m.result?.selectionCount==='number')selection.textContent=`${m.result.selectionCount} node${m.result.selectionCount===1?'':'s'}`;if(method==='get_metadata'&&m.ok&&m.result)updateFileInfo(m.result);hug();ws.send(JSON.stringify(m));}};connect();requestAnimationFrame(hug);
+function beginHello(fileKey,meta){if(ws?.readyState!==1||!fileKey)return;if(fileKey===inflightKey)return;inflightKey=fileKey;lastHello=null;ws.send(JSON.stringify({type:'hello-begin',fileKey,...meta}));}
+/*
+ * The server proves the file key to us in `ready`. Until that MAC verifies, a
+ * message with a `method` is not a bridge request, even if something is
+ * listening on the port. This is the other half of the token proof: the plugin
+ * proves itself to the server, and the server proves itself to the plugin.
+ */
+function verifyReady(m){
+  if(!lastHello||typeof m.mac!=='string'||m.fileKey!==lastHello.fileKey)return false;
+  const expected=hmacSha256Hex(token,`ready\u0000${lastHello.nonce}.${lastHello.serverNonce}\u0000${lastHello.fileKey}`);
+  return m.mac===expected;
+}
+function connect(){
+  stopRegistration();
+  inflightKey='';
+  lastHello=null;
+  serverVerified=false;
+  busy=false;
+  setStatus('Connecting…','connecting');
+  try{ws=new WebSocket(endpoint);}catch(error){setStatus('Connection blocked','error');setTimeout(connect,1500);return;}
+  ws.onopen=()=>{setStatus('Registering file…','connecting');beginHello(fallbackKey,{name:'Figma document',editorType:'figma'});requestFileInfo();registrationTimer=setInterval(requestFileInfo,500);};
+  ws.onerror=()=>setStatus('Bridge unavailable','error');
+  ws.onclose=()=>{stopRegistration();inflightKey='';lastHello=null;serverVerified=false;const retryBusy=busy;busy=false;setStatus(retryBusy?busyText:'Disconnected · retrying','error');setTimeout(connect,1500);};
+  ws.onmessage=e=>{
+    let m;
+    try{m=JSON.parse(e.data);}catch{return;}
+    if(m.type==='challenge'&&typeof m.nonce==='string'&&typeof m.serverNonce==='string'){
+      const fileKey=inflightKey;
+      if(!fileKey)return;
+      lastHello={nonce:m.nonce,serverNonce:m.serverNonce,fileKey};
+      const mac=hmacSha256Hex(token,`hello\u0000${m.nonce}\u0000${fileKey}`);
+      if(fileKey===inflightKey&&ws.readyState===1)ws.send(JSON.stringify({type:'hello',nonce:m.nonce,serverNonce:m.serverNonce,mac,fileKey}));
+      return;
+    }
+    if(m.type==='error'&&m.code==='FILE_BUSY'){busy=true;setStatus(busyText,'error');return;}
+    if(m.type==='error'&&(m.code==='UNAUTHORIZED'||m.code==='STALE_CHALLENGE')){
+      setStatus(m.code==='UNAUTHORIZED'?'Bridge rejected this token':'Challenge expired','error');
+      try{ws.close();}catch{}
+      return;
+    }
+    if(m.type==='ready'){
+      if(!serverVerified){
+        if(!verifyReady(m)){setStatus('Bridge failed the token check','error');try{ws.close();}catch{}return;}
+        serverVerified=true;
+      }
+      inflightKey='';
+      if(info&&m.fileKey===info.fileKey){stopRegistration();busy=false;setStatus('Connected','connected');}
+      else{requestFileInfo();}
+      return;
+    }
+    if(m.method){
+      if(!serverVerified){parent.postMessage({pluginMessage:{type:'response',id:m.id,ok:false,error:{code:'UNVERIFIED_BRIDGE',message:'The bridge has not proved it knows the plugin token'}}},'*');return;}
+      pendingMethods.set(m.id,m.method);
+      parent.postMessage({pluginMessage:{type:'request',id:m.id,method:m.method,params:m.params}},'*');
+    }
+  };
+}
+window.onmessage=e=>{const m=e.data.pluginMessage;if(m?.type==='selection'&&typeof m.count==='number'){selection.textContent=`${m.count} node${m.count===1?'':'s'}`;hug();}if(m?.type==='file-info'){updateFileInfo(m);if(ws?.readyState===1){const {type:_drop,...fileInfo}=m;beginHello(fileInfo.fileKey,fileInfo);}}if(m?.type==='response'&&ws?.readyState===1){const method=pendingMethods.get(m.id);pendingMethods.delete(m.id);if(method==='get_selection'&&m.ok&&Array.isArray(m.result))selection.textContent=`${m.result.length} node${m.result.length===1?'':'s'}`;if(method==='inspect_selection'&&m.ok&&typeof m.result?.selectionCount==='number')selection.textContent=`${m.result.selectionCount} node${m.result.selectionCount===1?'':'s'}`;if(method==='get_metadata'&&m.ok&&m.result)updateFileInfo(m.result);hug();ws.send(JSON.stringify(m));}};
+connect();
+requestAnimationFrame(hug);
 </script>
 </body>
 </html>

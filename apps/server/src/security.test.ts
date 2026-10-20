@@ -12,8 +12,8 @@ const port = 21995;
 const token = 'integration-test-token';
 const serverEntry = join(dirname(fileURLToPath(import.meta.url)), 'index.js');
 
-function macFor(nonce: string, label: string, secret = token): string {
-  return createHmac('sha256', secret).update(`${nonce}.${label}`).digest('hex');
+function macFor(domain: 'prove' | 'hello' | 'ready', nonce: string, label: string, secret = token): string {
+  return createHmac('sha256', secret).update(`${domain}\u0000${nonce}\u0000${label}`).digest('hex');
 }
 
 function startServer(extra: Record<string, string> = {}, listenPort = port): Promise<ChildProcess> {
@@ -63,17 +63,45 @@ function registerPlugin(fileKey: string, name = fileKey): Promise<WebSocket> {
   return new Promise((resolve, reject) => {
     const ws = new WebSocket(`ws://127.0.0.1:${port}/ws`, { origin: 'null' });
     const timer = setTimeout(() => { ws.terminate(); reject(new Error(`hello timed out for ${fileKey}`)); }, 4000);
+    let clientNonce = '';
+    let serverNonce = '';
     ws.on('error', error => { clearTimeout(timer); reject(error); });
     ws.on('open', () => ws.send(JSON.stringify({ type: 'hello-begin', fileKey, name, editorType: 'figma' })));
     ws.on('message', data => {
       const msg = JSON.parse(data.toString());
-      if (msg.type === 'challenge') ws.send(JSON.stringify({ type: 'hello', nonce: msg.nonce, mac: macFor(msg.nonce, fileKey), fileKey }));
-      else if (msg.type === 'ready') { clearTimeout(timer); resolve(ws); }
-      else if (msg.type === 'error' && msg.code !== 'STALE_CHALLENGE') {
+      if (msg.type === 'challenge') {
+        clientNonce = msg.nonce;
+        serverNonce = msg.serverNonce;
+        ws.send(JSON.stringify({ type: 'hello', nonce: msg.nonce, serverNonce: msg.serverNonce, mac: macFor('hello', msg.nonce, fileKey), fileKey }));
+      } else if (msg.type === 'ready') {
+        if (msg.mac !== macFor('ready', `${clientNonce}.${serverNonce}`, fileKey)) {
+          clearTimeout(timer);
+          ws.terminate();
+          reject(new Error('server did not prove the bridge token'));
+          return;
+        }
+        clearTimeout(timer);
+        resolve(ws);
+      } else if (msg.type === 'error' && msg.code !== 'STALE_CHALLENGE') {
         clearTimeout(timer);
         reject(Object.assign(new Error(msg.message ?? msg.code), { code: msg.code }));
       }
     });
+  });
+}
+
+function helloOutcome(send: (challenge: { nonce: string; serverNonce: string }, ws: WebSocket) => void, fileKey: string): Promise<string> {
+  return new Promise(resolve => {
+    const ws = new WebSocket(`ws://127.0.0.1:${port}/ws`, { origin: 'null' });
+    ws.on('open', () => ws.send(JSON.stringify({ type: 'hello-begin', fileKey, name: 'Probe' })));
+    ws.on('message', data => {
+      const msg = JSON.parse(data.toString());
+      if (msg.type === 'challenge') send(msg, ws);
+      else if (msg.type === 'error') resolve(msg.code);
+      else if (msg.type === 'ready') resolve('ready');
+    });
+    ws.on('error', () => resolve('error'));
+    setTimeout(() => resolve('timeout'), 4000);
   });
 }
 
@@ -118,8 +146,26 @@ test('/prove lets a follower check the leader without sending the token', async 
   const response = await fetch(`http://127.0.0.1:${port}/prove?nonce=${nonce}`);
   assert.equal(response.status, 200);
   const body = await response.json() as { mac: string };
-  assert.equal(body.mac, macFor(nonce, 'leader'));
+  assert.equal(body.mac, macFor('prove', nonce, 'leader'));
   assert.equal(JSON.stringify(body).includes(token), false);
+});
+
+test('a prove MAC cannot complete hello for the same label', async () => {
+  const outcome = await helloOutcome((challenge, ws) => {
+    const proveMac = macFor('prove', challenge.nonce, 'proved-file');
+    ws.send(JSON.stringify({ type: 'hello', nonce: challenge.nonce, serverNonce: challenge.serverNonce, mac: proveMac, fileKey: 'proved-file' }));
+  }, 'proved-file');
+  assert.equal(outcome, 'UNAUTHORIZED');
+});
+
+test('the reserved file key leader cannot register', async () => {
+  const outcome = await helloOutcome(() => {}, 'leader');
+  assert.equal(outcome, 'UNAUTHORIZED');
+});
+
+test('ready carries a server MAC over both nonces', async () => {
+  const ws = await registerPlugin('ready-proof-file', 'Ready proof');
+  ws.close();
 });
 
 test('rejects WebSocket upgrades from remote origins', async () => {
@@ -149,17 +195,9 @@ test('rejects a cleartext token and a bad MAC', async () => {
   });
   assert.equal(cleartext, 'error-received');
 
-  const badMac = await new Promise<string>(resolve => {
-    const ws = new WebSocket(`ws://127.0.0.1:${port}/ws`, { origin: 'null' });
-    ws.on('open', () => ws.send(JSON.stringify({ type: 'hello-begin', fileKey: 'attacker-file', name: 'Attacker' })));
-    ws.on('message', data => {
-      const msg = JSON.parse(data.toString());
-      if (msg.type === 'challenge') ws.send(JSON.stringify({ type: 'hello', nonce: msg.nonce, mac: '0'.repeat(64), fileKey: 'attacker-file' }));
-      if (msg.type === 'error') resolve(msg.code);
-    });
-    ws.on('error', () => resolve('error'));
-    setTimeout(() => resolve('timeout'), 4000);
-  });
+  const badMac = await helloOutcome((challenge, ws) => {
+    ws.send(JSON.stringify({ type: 'hello', nonce: challenge.nonce, serverNonce: challenge.serverNonce, mac: '0'.repeat(64), fileKey: 'attacker-file' }));
+  }, 'attacker-file');
   assert.equal(badMac, 'UNAUTHORIZED');
 });
 
@@ -203,7 +241,7 @@ test('drops a plugin that stops answering pings and lets the next hello take the
     ws.on('open', () => ws.send(JSON.stringify({ type: 'hello-begin', fileKey: 'ping-file', name: 'Ping' })));
     ws.on('message', data => {
       const msg = JSON.parse(data.toString());
-      if (msg.type === 'challenge') ws.send(JSON.stringify({ type: 'hello', nonce: msg.nonce, mac: macFor(msg.nonce, 'ping-file'), fileKey: 'ping-file' }));
+      if (msg.type === 'challenge') ws.send(JSON.stringify({ type: 'hello', nonce: msg.nonce, serverNonce: msg.serverNonce, mac: macFor('hello', msg.nonce, 'ping-file'), fileKey: 'ping-file' }));
       else if (msg.type === 'ready') { clearTimeout(timer); resolve(ws); }
     });
   });

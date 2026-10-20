@@ -1,16 +1,25 @@
 import { createHash } from 'node:crypto';
 import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { restrictToOwner } from './owner-only.js';
 
 export const TOKEN_PLACEHOLDER = '__PHOLLY_TOKEN__';
+export const PORT_PLACEHOLDER = '__PHOLLY_PORT__';
 
 export function pluginIdSuffix(token: string): string {
   return createHash('sha256').update(token).digest('hex').slice(0, 8);
 }
 
-export function stampPlugin(bundledDir: string, targetDir: string, token: string): void {
+export function bridgePort(): number {
+  return Number(process.env.PHOLLY_PORT ?? 1995);
+}
+
+export function stampPlugin(bundledDir: string, targetDir: string, token: string, port = bridgePort()): void {
   if (!existsSync(join(bundledDir, 'code.js')) || !existsSync(join(bundledDir, 'ui.html')) || !existsSync(join(bundledDir, 'manifest.json'))) {
     throw new Error(`bundled plugin not found at ${bundledDir}`);
+  }
+  if (!Number.isInteger(port) || port < 1 || port > 65535) {
+    throw new Error(`invalid bridge port: ${String(port)}`);
   }
   mkdirSync(targetDir, { recursive: true, mode: 0o700 });
   chmodSync(targetDir, 0o700);
@@ -18,10 +27,12 @@ export function stampPlugin(bundledDir: string, targetDir: string, token: string
     const path = join(targetDir, name);
     writeFileSync(path, contents, { mode: 0o600 });
     chmodSync(path, 0o600);
+    restrictToOwner(path);
   };
-  writeSecret('code.js', readFileSync(join(bundledDir, 'code.js'), 'utf8').replaceAll(TOKEN_PLACEHOLDER, token));
+  const stamp = (contents: string) => contents.replaceAll(TOKEN_PLACEHOLDER, token).replaceAll(PORT_PLACEHOLDER, String(port));
+  writeSecret('code.js', stamp(readFileSync(join(bundledDir, 'code.js'), 'utf8')));
   const manifest = JSON.parse(readFileSync(join(bundledDir, 'manifest.json'), 'utf8')) as { id?: unknown };
   const stampedId = typeof manifest.id === 'string' && manifest.id ? `${manifest.id}-${pluginIdSuffix(token)}` : manifest.id;
-  writeSecret('manifest.json', JSON.stringify({ ...manifest, id: stampedId }, null, 2));
-  writeSecret('ui.html', readFileSync(join(bundledDir, 'ui.html'), 'utf8').replaceAll(TOKEN_PLACEHOLDER, token));
+  writeSecret('manifest.json', stamp(JSON.stringify({ ...manifest, id: stampedId }, null, 2)));
+  writeSecret('ui.html', stamp(readFileSync(join(bundledDir, 'ui.html'), 'utf8')));
 }

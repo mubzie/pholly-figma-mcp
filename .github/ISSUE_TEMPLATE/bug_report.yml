@@ -1,0 +1,42 @@
+name: Bug report
+description: Something in the bridge, plugin, or a tool does not work
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Do not report a live security exploit here. Use the Security tab and "Report a vulnerability".
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Package version, `git rev-parse --short HEAD`, or both.
+    validations:
+      required: true
+  - type: dropdown
+    id: surface
+    attributes:
+      label: Surface
+      options:
+        - Install or setup
+        - MCP client connection
+        - Figma plugin connection
+        - A specific tool
+        - Documentation
+  - type: input
+    id: tool
+    attributes:
+      label: Tool or endpoint
+      description: For example `render_design`, `/prove`, or `setup`.
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Include the exact call, the expected result, and what happened.
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: OS, Node version, Figma desktop or web, MCP client.

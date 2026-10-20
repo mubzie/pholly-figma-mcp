@@ -5,6 +5,34 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2026-10-19
+
+### Security
+- The plugin now verifies the server. `ready` carries a MAC over the plugin's challenge nonce and a server nonce, and the plugin drops any `method` frame until that MAC verifies. A local process that accepts `ws://localhost:<port>` can no longer read or edit the open Figma file without the token.
+- HMAC purposes are domain-separated (`prove`, `hello`, `ready`). The unauthenticated `/prove` MAC can no longer register a plugin. The file key `leader` is reserved.
+- Followers re-prove the leader before every request and stop sending the bearer token if the proof fails.
+- `create_image` blocks loopback, private, link-local, and metadata addresses on the first request and on redirects, and caps data URIs. `PHOLLY_ALLOW_PRIVATE_IMAGE_HOSTS=1` is the explicit escape hatch.
+- Socket errors are handled, in-flight calls fail on disconnect instead of waiting for the timeout, and the stdio request path catches rejections.
+- On Windows, setup and token creation apply an owner-only `icacls` restriction. The README no longer presents `0600` as a Windows control.
+
+### Changed
+- BREAKING: the plugin hello is HMAC with a server nonce, so a 0.2.1 plugin cannot talk to a 0.3.0 server, and the reverse. Delete the development plugin entry in Figma and re-import the stamped manifest.
+- BREAKING: `render_design` in `reconcile` mode requires `confirmDelete: true` before it deletes keyed children that are absent from a supplied `children` array. Omitting `children` still deletes nothing.
+- `render_design` applies text and layout on both create and update, and rejects an unknown `mode` instead of treating it as `append`.
+- `set_text_properties` applies `color`. Mixed-font text is loaded per range instead of casting `fontName`.
+- `set_auto_layout` accepts both `direction`/`gap` and `mode`/`itemSpacing`.
+- `get_design_context` errors on an unknown node id. `get_styles` returns style payloads, not just metadata. `delete_nodes` reports `deleted` and `missing` separately and refuses pages.
+- `batch` rejects `create_image`, `export_selection_assets`, `save_screenshots`, `undo`, `commit_undo`, `clear_changes`, and `list_files`, not only `delete_nodes` and nested `batch`.
+- `set_solid_fill` honors the alpha in a four- or eight-digit hex color through paint opacity.
+- The MCP server echoes a supported client protocol version. Unknown tool names and invalid arguments are rejected before the plugin is called.
+- The plugin test script uses `tsx`, so it runs on Node 20 as well as newer versions.
+- `setup` stamps the bridge port into the plugin and its `networkAccess` allowlist.
+- The root build copies the plugin into `apps/server/plugin`, so the documented clean-clone `setup` works.
+
+### Added
+- `enablePrivatePluginApi` in the development manifest, so `figma.fileKey` can be the real file key.
+- CI workflow, Dependabot configuration, issue template, and `LICENSE` in the published package.
+
 ## [0.2.2] - 2026-09-25
 
 ### Fixed

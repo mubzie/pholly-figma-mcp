@@ -1,16 +1,18 @@
 {
   "name": "@pholly/figma-plugin",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.3.0",
   "type": "module",
   "scripts": {
     "build": "node build.mjs",
     "dev": "node build.mjs --watch",
     "typecheck": "tsc -p tsconfig.json",
-    "test": "node --experimental-strip-types --test src/policy.test.ts src/bridge-hmac.test.ts"
+    "test": "node --import tsx --test src/policy.test.ts src/bridge-hmac.test.ts"
   },
   "devDependencies": {
     "@figma/plugin-typings": "^1.107.0",
-    "esbuild": "^0.25.12"
-  }
+    "esbuild": "^0.25.12",
+    "tsx": "^4.19.2"
+  },
+  "license": "MIT"
 }
